@@ -7,14 +7,14 @@
 
 
 -- Référentiel d'efficacité des molécules SEP (pré-classé pour test7_sep.py)
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Interféron beta-1a', 'Faible_Moderee', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Acétate de glatiramère', 'Faible_Moderee', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Tériflunomide', 'Faible_Moderee', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Diméthyl fumarate', 'Faible_Moderee', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Natalizumab', 'Haute_efficacite', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Fingolimod', 'Haute_efficacite', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Ocrelizumab', 'Haute_efficacite', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
-INSERT INTO reference_groupe_efficacite (molecule, groupe, classe_par) VALUES ('Rituximab', 'Haute_efficacite', 'seed_simulation') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Interféron beta-1a', 'Faible_Moderee') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Acétate de glatiramère', 'Faible_Moderee') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Tériflunomide', 'Faible_Moderee') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Diméthyl fumarate', 'Faible_Moderee') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Natalizumab', 'Haute_efficacite') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Fingolimod', 'Haute_efficacite') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Ocrelizumab', 'Haute_efficacite') ON CONFLICT (molecule) DO NOTHING;
+INSERT INTO reference_groupe_efficacite (molecule, groupe) VALUES ('Rituximab', 'Haute_efficacite') ON CONFLICT (molecule) DO NOTHING;
 
 -- ================= REGISTRE SEP =================
 INSERT INTO patients (pseudonyme, registre, date_inclusion, age) VALUES ('SEP_SIM_0001', 'SEP', '2022-04-04', 8.7) ON CONFLICT (pseudonyme) DO NOTHING;

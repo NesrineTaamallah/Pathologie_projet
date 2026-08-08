@@ -4,6 +4,10 @@ import threading
 
 from llama_cpp import Llama
 
+
+print(f"### FICHIER CHARGE DEPUIS : {__file__}", flush=True)
+
+
 MODEL_PATH = r"C:\hf-cache\qwen3-8b-gguf\Qwen3-8B-Q4_K_M.gguf"
 
 CHAMPS = [
