@@ -549,35 +549,6 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                   {audioUrl && (
                     <audio controls src={audioUrl} style={{ width: '100%', marginBottom: 10 }} />
                   )}
-                  {Array.isArray(result.mots_confiance) && result.mots_confiance.length > 0 && (
-                    <div style={{ marginBottom: 10 }}>
-                      <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate-soft)' }}>
-                        Score de confiance Whisper (survolez un mot en rouge pour vérifier)
-                      </p>
-                      <div style={{
-                        fontSize: 13, lineHeight: 1.9, padding: 10, background: 'var(--paper)',
-                        border: '1px solid var(--line)', borderRadius: 8,
-                      }}>
-                        {result.mots_confiance.map((w, i) => {
-                          const color = w.confidence === 'low'
-                            ? '#d92d20'
-                            : w.confidence === 'medium'
-                              ? '#c8790f'
-                              : 'var(--slate)';
-                          const weight = w.confidence === 'low' ? 700 : 400;
-                          return (
-                            <span
-                              key={i}
-                              title={`score: ${w.score}`}
-                              style={{ color, fontWeight: weight, marginRight: 4 }}
-                            >
-                              {w.word}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                   <textarea
                     value={texteCorrige}
                     onChange={(e) => setTexteCorrige(e.target.value)}

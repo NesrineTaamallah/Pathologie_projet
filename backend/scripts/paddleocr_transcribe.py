@@ -386,6 +386,49 @@ def detecter_table_tronquee(texte: str, seuil_lignes: int = 5) -> dict:
     return {"tronque": bool(alertes), "alertes": alertes}
 
 
+def html_tables_vers_markdown(texte: str) -> str:
+    """Convertit les tableaux HTML (<table>...</table>) générés par PaddleOCR-VL
+    en tableaux Markdown natifs (syntaxe | col1 | col2 |), pour un rendu lisible
+    dans un viewer Markdown standard.
+    """
+    from bs4 import BeautifulSoup
+
+    def _convertir_une_table(match: "re.Match") -> str:
+        html_table = match.group(0)
+        soup = BeautifulSoup(html_table, "html.parser")
+        table = soup.find("table")
+        if table is None:
+            return html_table
+
+        lignes = []
+        for tr in table.find_all("tr"):
+            cellules = [
+                c.get_text(separator=" ", strip=True) or "-"
+                for c in tr.find_all(["td", "th"])
+            ]
+            if cellules:
+                lignes.append(cellules)
+
+        if not lignes:
+            return html_table
+
+        n_cols = max(len(l) for l in lignes)
+        lignes = [l + ["-"] * (n_cols - len(l)) for l in lignes]
+
+        def _echapper(cellule: str) -> str:
+            return cellule.replace("|", "\\|").replace("\n", " ")
+
+        md_lignes = []
+        md_lignes.append("| " + " | ".join(_echapper(c) for c in lignes[0]) + " |")
+        md_lignes.append("|" + "---|" * n_cols)
+        for ligne in lignes[1:]:
+            md_lignes.append("| " + " | ".join(_echapper(c) for c in ligne) + " |")
+
+        return "\n".join(md_lignes)
+
+    return re.sub(r"<table[^>]*>.*?</table>", _convertir_une_table, texte, flags=re.DOTALL)
+
+
 def nettoyer_markdown(contenu: str) -> tuple:
     
     contenu = strip_inline_images(contenu)
@@ -395,6 +438,9 @@ def nettoyer_markdown(contenu: str) -> tuple:
     qc_msgs = []
     if tbl_diag["tronque"]:
         qc_msgs.append(f"table_probablement_tronquee={tbl_diag['alertes']}")
+
+    
+    contenu = html_tables_vers_markdown(contenu)
 
     if qc_msgs:
         commentaire = f"<!-- OCR_QC: {'; '.join(qc_msgs)} -->\n"

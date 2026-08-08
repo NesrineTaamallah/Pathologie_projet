@@ -1,12 +1,10 @@
-
 import json
 import re
 import threading
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from llama_cpp import Llama
 
-MODEL_NAME = "Qwen/Qwen3-8B"
+MODEL_PATH = r"C:\hf-cache\qwen3-8b-gguf\Qwen3-8B-Q4_K_M.gguf"
 
 CHAMPS = [
     "numero_dossier", "nom_prenom", "date_naissance", "adresse", "origine",
@@ -40,23 +38,16 @@ def _charger_modele():
         if _extractor_model is not None or _model_load_error is not None:
             return
         try:
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_use_double_quant=True,
+            model = Llama(
+                model_path=MODEL_PATH,
+                n_ctx=8192,
+                n_gpu_layers=-1,
+                verbose=False,
             )
-            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-            model = AutoModelForCausalLM.from_pretrained(
-                MODEL_NAME,
-                quantization_config=bnb_config,
-                device_map="auto",
-                torch_dtype=torch.float16,
-            )
-            _extractor_tokenizer = tokenizer
+            _extractor_tokenizer = None  # non utilisé avec llama.cpp (chat template intégré)
             _extractor_model = model
         except Exception as exc:
-            
+
             _model_load_error = str(exc)
             raise
 
@@ -73,30 +64,21 @@ def _normaliser(resultat: dict) -> dict:
 
 
 def extraire_donnees_patient(texte: str, chunking: bool = True, verbose: bool = False) -> dict:
-    
+
     _charger_modele()
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": texte},
     ]
-    prompt = _extractor_tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    inputs = _extractor_tokenizer(prompt, return_tensors="pt").to(_extractor_model.device)
 
-    with torch.no_grad():
-        sortie = _extractor_model.generate(
-            **inputs,
-            max_new_tokens=512,
-            do_sample=False,
-            temperature=None,
-            top_p=None,
-        )
-
-    texte_genere = _extractor_tokenizer.decode(
-        sortie[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
+    sortie = _extractor_model.create_chat_completion(
+        messages=messages,
+        max_tokens=512,
+        temperature=0,
     )
+
+    texte_genere = sortie["choices"][0]["message"]["content"]
     if verbose:
         print(f"[extraction_patient] sortie brute du modèle :\n{texte_genere}")
 
