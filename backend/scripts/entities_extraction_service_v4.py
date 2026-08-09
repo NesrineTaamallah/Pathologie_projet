@@ -1,13 +1,4 @@
-"""
-Microservice d'extraction d'entités médicales (SEP/EPR).
 
-Toute la logique métier (schémas, prompts, chunking, contexte ciblé, vote,
-décomposition AE, fenêtre de récence, vérification ciblée, orchestration)
-provient telle quelle du notebook berrasmi-final-v3-9dossiers.ipynb.
-Seul l'appel au LLM (section 4 du notebook, ex-chargement local Qwen3-8B
-via outlines/transformers) est remplacé par un appel HTTP au serveur Qwen
-déjà démarré sur localhost:8003 (même modèle, autre point d'entrée).
-"""
 
 import json
 import time
@@ -57,11 +48,7 @@ VERIFICATION_TABLES_SEP = set()
 GREEDY_SAMPLER = "greedy"
 REPEATED_SAMPLER = "multinomial"
 
-# ## 2. Config — schémas d'extraction (SEP : 11 tables, EPR : 18 tables)
-# 
-# Inchangé par rapport au notebook précédent : `mots_cles` (contexte ciblé, point 4)
-# et `priorite_recente` (point 8) restent la source de vérité utilisée aussi par les
-# nouvelles briques (sections 8-11) — aucune duplication de config.
+
 
 
 
@@ -1714,11 +1701,7 @@ def _champ_to_json_schema(champ):
 
 
 def build_json_schema(table_cfg, force_min_items=False):
-    """force_min_items=True (NOUVEAU) : ajoute 'minItems': 1 au schema d'une
-    table repetee -> contrainte structurelle qui empeche outlines de fermer
-    le tableau JSON a []. A n'utiliser QUE quand on sait deja, par le
-    contexte cible (point 4), qu'il existe des chunks pertinents pour cette
-    table (cf. section 8) - sinon on forcerait une hallucination d'objet."""
+    
     properties, required = {}, []
     for champ in table_cfg["champs"]:
         properties[champ["nom"]] = _champ_to_json_schema(champ)
@@ -1937,9 +1920,7 @@ def validate_result(raw, table_cfg, texte):
 
 
 def enforce_unique_etiologie_principale(etiologies):
-    """Correction 4 : une seule etiologie_principale=true, celle de la derniere
-    occurrence marquee (le prompt/point 8 privilegie deja la conclusion la
-    plus tardive ; ceci est un filet de securite deterministe)."""
+    
     if not etiologies:
         return etiologies, None
     principales = [e for e in etiologies if e.get("etiologie_principale") is True]
@@ -2054,9 +2035,7 @@ def _tronquer_si_besoin(texte, max_chars=MAX_CONTEXTE_TABLE_CHARS):
 
 
 def _dict_signature(obj, exclude_prefixes=("evidence_span_", "_")):
-    """Represente un objet (occurrence) sous forme de chaine pour le fuzzy-match,
-    en excluant les champs meta (evidence_span_*, _note...) qui ne doivent pas
-    peser dans la comparaison de similarite."""
+    
     items = sorted((k, str(v)) for k, v in obj.items()
                     if not any(k.startswith(p) for p in exclude_prefixes))
     return json.dumps(items, ensure_ascii=False)
@@ -2070,9 +2049,7 @@ def _similarity(obj_a, obj_b):
 
 
 def _majority_merge(cluster_objs):
-    """Fusionne un cluster d'occurrences 'equivalentes' (issues de runs differents)
-    par vote majoritaire champ par champ. En cas d'egalite, garde la valeur du
-    1er objet du cluster (ordre = ordre des runs, run 1 sert de priorite)."""
+    
     all_keys = set()
     for o in cluster_objs:
         all_keys.update(o.keys())
@@ -2086,10 +2063,9 @@ def _majority_merge(cluster_objs):
 
 
 def fuzzy_merge_occurrences(runs_occurrences, threshold=VOTE_DEDUP_THRESHOLD):
-    """runs_occurrences : liste de listes d'occurrences (1 sous-liste par run).
-    Retourne la liste fusionnee/dedupliquee (clustering glouton par similarite)."""
+    
     flat = [obj for run in runs_occurrences for obj in run]
-    clusters = []  # liste de listes d'objets "equivalents"
+    clusters = []  
     for obj in flat:
         placed = False
         for cluster in clusters:
@@ -2103,9 +2079,7 @@ def fuzzy_merge_occurrences(runs_occurrences, threshold=VOTE_DEDUP_THRESHOLD):
 
 
 def extraire_table_avec_vote(table_cfg, texte_table, n_matches_mots_cles):
-    """Remplace un simple appel llm_extract() pour une table repetee : genere
-    N_VOTES_REPEATED fois, fusionne par vote flou. Retourne (payload, meta) ou
-    meta documente ce qui s'est passe (utile pour les diagnostics, section 15)."""
+    
     table_name = table_cfg["table"]
     force_min_items = n_matches_mots_cles >= RETRIEVAL_MIN_MATCHES
     schema = build_json_schema(table_cfg, force_min_items=force_min_items)
@@ -2131,12 +2105,9 @@ def extraire_table_avec_vote(table_cfg, texte_table, n_matches_mots_cles):
     return fused, meta
 
 def extraire_table_repetee_standard(table_cfg, texte_table):
-    """Tables repetees NON listees dans VOTE_TABLES_* : 1 seul appel
-    multinomial(T=0.3), sans vote ni minItems force -> comportement identique
-    a la version simple (point 4 + point 8), pour garder le cout GPU sous
-    controle sur les tables ou le vote n'a pas montre d'effet mesure."""
+    
     table_name = table_cfg["table"]
-    schema = build_json_schema(table_cfg)  # force_min_items=False (defaut)
+    schema = build_json_schema(table_cfg) 
     max_tokens = table_cfg.get("max_tokens", MAX_NEW_TOKENS)
     try:
         raw = llm_extract(build_prompt(table_cfg, texte_table), schema,
@@ -2265,9 +2236,7 @@ JSON :
 
 
 def _retrieve_chunks_pour_medicament(chunks_dossier, table_cfg, nom_ae):
-    """Reutilise retrieve_chunks_for_table en AJOUTANT le nom du medicament
-    (mots significatifs de nom_ae) aux mots-cles de la table -> contexte
-    cible SPECIFIQUE a ce medicament, pas seulement 'antiepileptique' en general."""
+    
     mots_specifiques = [w.strip("()") for w in re.split(r"[\s,/()]+", nom_ae) if len(w.strip("()")) >= 4]
     table_cfg_specifique = dict(table_cfg)
     table_cfg_specifique["mots_cles"] = list(table_cfg.get("mots_cles") or []) + mots_specifiques
@@ -2275,15 +2244,7 @@ def _retrieve_chunks_pour_medicament(chunks_dossier, table_cfg, nom_ae):
 
 
 def extraire_liste_ae_deux_etapes(chunks_dossier, table_cfg):
-    """Correction 2' : remplace l'appel standard pour epr_liste_ae par une
-    extraction en 2 etapes (noms -> details par medicament). Retourne
-    (occurrences, meta) au meme format que extraire_table_avec_vote.
-
-    NOTE (bascule Qwen3) : les 2 etapes passent maintenant par llm_extract()
-    (au lieu d'appeler outlines.generate.json directement comme avant) afin de
-    beneficier du template de chat centralise (format_prompt_chat, section 4) -
-    un seul point de controle pour tous les appels LLM du notebook."""
-    # --- Etape 1 : lister les noms ---
+    
     chunks_table, diag1 = retrieve_chunks_for_table(chunks_dossier, table_cfg)
     texte_table = _tronquer_si_besoin(assemble_contexte(chunks_table))
     prompt_noms = _NOMS_AE_PROMPT_TMPL.format(texte=texte_table)
@@ -2322,31 +2283,11 @@ def extraire_liste_ae_deux_etapes(chunks_dossier, table_cfg):
     return occurrences, meta
 
 
-# ## 10. Fenêtre de récence pour les tables `priorite_recente` (correction 3')
-
-# ## 10. Fenêtre de récence pour les tables `priorite_recente` (correction 3')
-# 
-# **Problème initial** : la règle 10 du template ("retiens toujours le plus
-# récent") est une instruction molle — le diagnostic EPR montre que le LLM
-# retient parfois le **premier** statut rencontré malgré cette règle
-# (`epr_suivi` : "Libre de crises" précoce au lieu de "Épilepsie active" final).
-# 
-# **Solution déterministe, sans logique de parsing de dates fragile** : les
-# chunks sont déjà chronologiquement ordonnés (`idx`). Pour une table
-# `priorite_recente=true` **non répétée** (`sep_evolution`, `sep_suivi`,
-# `epr_pharmacoresistance`, `epr_suivi`), on lance une **2e extraction** sur une
-# **fenêtre restreinte au dernier tiers chronologique** des chunks retenus par le
-# contexte ciblé (point 4) — le LLM ne peut alors physiquement plus "voir" les
-# statuts anciens, donc ne peut plus s'y raccrocher. Si cette extraction "fenêtre
-# récente" diffère de l'extraction "contexte complet" ET n'est pas vide, elle
-# **prime** sur cette dernière.
-# 
 
 
 
 def extraire_avec_fenetre_recente(chunks_dossier, table_cfg, resultat_contexte_complet, texte_contexte_complet):
-    """table_cfg doit avoir priorite_recente=true et repetee=false.
-    Retourne (resultat_final, meta)."""
+    
     table_name = table_cfg["table"]
     chunks_table, _ = retrieve_chunks_for_table(chunks_dossier, table_cfg)
     n = len(chunks_table)
@@ -2438,10 +2379,7 @@ def _regles_courtes(table_cfg):
 
 
 def verifier_table(table_cfg, payload_extrait, texte_table):
-    """Point 5' : passe de verification ciblee. payload_extrait est deja
-    caste (types Python natifs) ; on le re-serialise en litteraux "null"/"NA"/
-    "true"/"false" attendus par le schema JSON contraint (coherence avec le
-    reste du pipeline), puis on re-caste le resultat corrige."""
+    
     table_name = table_cfg["table"]
     if not payload_extrait:
         return payload_extrait, {"table": table_name, "verification_appliquee": False,

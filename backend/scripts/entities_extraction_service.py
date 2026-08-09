@@ -16,6 +16,7 @@ import re
 import datetime
 import itertools
 import unicodedata
+import difflib
 from pathlib import Path
 from collections import Counter
 
@@ -26,6 +27,13 @@ from jinja2 import Environment
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+# CORRECTIF : HAVE_RAPIDFUZZ etait reference (lignes _find_evidence, _similarity)
+# mais jamais defini -> NameError des qu'un champ extrait a une vraie valeur
+# non-nulle (le bug ne se voit PAS quand tout est null, d'ou son invisibilite
+# dans les premiers tests). rapidfuzz est importe sans garde try/except
+# au-dessus donc s'il est present (il l'est, cf. pip show), il est utilisable.
+HAVE_RAPIDFUZZ = True
+
 app = FastAPI(title="Entités médicales — service d'extraction")
 
 # ---------------------------------------------------------------------------
@@ -35,6 +43,14 @@ QWEN_API_URL = "http://localhost:8003/v1/chat/completions"
 QWEN_MODEL_NAME = "Qwen/Qwen3-8B"   # doit correspondre exactement au nom déclaré côté serveur vLLM/TGI
 QWEN_TIMEOUT_S = 120
 QWEN_MAX_RETRIES = 3
+
+# CORRECTIF : ces deux constantes étaient utilisées (extraire_table_avec_vote,
+# extraire_table_repetee_standard, extraire_liste_ae_deux_etapes, verifier_table)
+# mais jamais définies -> NameError silencieusement avalé par les blocs
+# "except Exception: occs = []" -> toutes les tables répétées et toutes les
+# vérifications ciblées retournaient [] systématiquement, quel que soit le texte.
+GREEDY_SAMPLER = "greedy"
+REPEATED_SAMPLER = "multinomial"
 
 # ---------------------------------------------------------------------------
 # ## 1. Paramètres (section 1 du notebook, sans les chemins Kaggle/OUTPUT_DIR)
@@ -2589,10 +2605,6 @@ def extraire_un_dossier(chunks_dossier, tables_config, registre_label):
             if issues:
                 erreurs.append({"table": table_name, "issues": issues})
 
-        except torch.cuda.OutOfMemoryError:
-            gc.collect(); torch.cuda.empty_cache()
-            erreurs.append({"table": table_name, "issues": ["OOM - reessayer avec max_tokens plus bas"]})
-            resultats[table_name] = [] if table_cfg["repetee"] else None
         except Exception as exc:
             erreurs.append({"table": table_name, "issues": [f"exception: {exc}"]})
             resultats[table_name] = [] if table_cfg["repetee"] else None

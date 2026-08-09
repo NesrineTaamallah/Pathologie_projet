@@ -77,7 +77,21 @@ async function extraireEntites(req, res) {
       );
     }
 
-    res.json({ pseudonyme, registre: contexte.registre, ...resultat });
+    // CORRECTIF : ne PAS spreader "resultat" tel quel — sa forme est
+    // { registre, patient_id, tables: {...}, a_verifier: [...],
+    //   diagnostics_contexte: [...], diagnostics_ameliorations: [...] }.
+    // Spreader directement transformait "tables", "a_verifier",
+    // "diagnostics_contexte", "diagnostics_ameliorations" en 4 clés
+    // top-level distinctes, que le frontend interprétait ensuite chacune
+    // comme si c'était une table clinique à afficher (bug visible dans la
+    // modale : sections "tables"/"a_verifier"/"diagnostics_contexte" au
+    // lieu des vraies tables sep_identification_clinique, sep_irm, etc.).
+    res.json({
+      pseudonyme,
+      registre: contexte.registre,
+      tables: resultat.tables,
+      a_verifier: resultat.a_verifier || [],
+    });
   } catch (err) {
     console.error('Erreur extraireEntites :', err);
     res.status(502).json({ error: err.message || "Échec de l'extraction des entités médicales." });

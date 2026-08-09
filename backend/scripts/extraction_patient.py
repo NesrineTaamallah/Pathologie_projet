@@ -165,6 +165,22 @@ def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
     if _extractor_model is None:
         raise RuntimeError(f"Modele non charge : {_model_load_error}")
 
+    messages = [dict(m) for m in messages]  # copie, on ne modifie pas l'original de l'appelant
+
+    if not enable_thinking:
+        # CORRECTIF : llama-cpp-python ne supporte PAS le kwarg "extra_body"
+        # (c'est une convention du SDK OpenAI, absente de create_chat_completion()
+        # -> TypeError -> 500 sur quasiment tous les appels d'extraction
+        # structuree, puisque enable_thinking=False est le cas quasi-systematique
+        # envoye par entities_extraction_service.py).
+        # Qwen3 desactive nativement le raisonnement via le marqueur "/no_think"
+        # insere dans le dernier message utilisateur (mecanisme du chat template
+        # Qwen3, pas besoin d'un kwarg dedie cote llama-cpp-python).
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                m["content"] = "/no_think\n" + m["content"]
+                break
+
     kwargs = dict(
         messages=messages,
         max_tokens=max_tokens,
@@ -175,12 +191,14 @@ def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
         # derivee automatiquement du schema) - equivalent local du
         # guided_json de vLLM, sans second serveur ni second modele.
         kwargs["response_format"] = {"type": "json_object", "schema": json_schema}
-    if not enable_thinking:
-        # Qwen3 : desactive le bloc <think> pour les appels d'extraction
-        # structuree (plus rapide, sortie directement exploitable).
-        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
 
-    return _extractor_model.create_chat_completion(**kwargs)
+    try:
+        return _extractor_model.create_chat_completion(**kwargs)
+    except Exception:
+        import traceback
+        print("=== ERREUR dans chat_completion_openai_like (create_chat_completion) ===")
+        traceback.print_exc()
+        raise
 
 
 # ============================================================

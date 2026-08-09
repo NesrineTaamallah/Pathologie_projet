@@ -18,7 +18,8 @@ import { IconRefresh, IconAlert, IconX, IconCheckCircle } from './Icons';
 export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed }) {
   const [statut, setStatut] = useState('idle'); // idle | loading | done | error
   const [erreur, setErreur] = useState('');
-  const [resultat, setResultat] = useState(null); // { registre, <table>: obj|[...] , ... }
+  const [resultat, setResultat] = useState(null); // { <table>: obj|[...] , ... } -- UNIQUEMENT les tables cliniques
+  const [aVerifier, setAVerifier] = useState([]); // [{ table, issues: [...] }, ...]
   const [registre, setRegistre] = useState(null);
 
   async function lancerExtraction() {
@@ -26,9 +27,15 @@ export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed
     setErreur('');
     try {
       const res = await client.post('/api/extraction/entites', { pseudonyme });
-      const { pseudonyme: _p, registre: reg, ...tables } = res.data;
-      setRegistre(reg);
-      setResultat(tables);
+      // CORRECTIF : res.data a la forme { pseudonyme, registre, tables: {...}, a_verifier: [...] }.
+      // On ne spread PAS tout le reste dans "resultat" -- on extrait
+      // explicitement "tables" (les vraies tables cliniques SEP/EPR) et
+      // "a_verifier" (les avertissements de validation) séparément, sinon
+      // "tables" et "a_verifier" eux-mêmes finissaient affichés comme si
+      // c'étaient des tables cliniques.
+      setRegistre(res.data.registre);
+      setResultat(res.data.tables || {});
+      setAVerifier(res.data.a_verifier || []);
       setStatut('done');
     } catch (err) {
       setErreur(err.response?.data?.error || "Échec de l'extraction des entités médicales.");
@@ -126,6 +133,25 @@ export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed
           <p className="error" style={{ margin: 0, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5 }}>
             <IconAlert size={13} /> {erreur}
           </p>
+        )}
+
+        {aVerifier.length > 0 && (
+          <div style={{
+            borderRadius: 12, border: '1.5px solid #f0c36d', background: '#fdf6e6',
+            padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconAlert size={13} /> À vérifier ({aVerifier.reduce((n, t) => n + t.issues.length, 0)} point{aVerifier.reduce((n, t) => n + t.issues.length, 0) > 1 ? 's' : ''})
+            </span>
+            {aVerifier.map((t) => (
+              <div key={t.table} style={{ fontSize: 11.5 }}>
+                <strong style={{ color: 'var(--slate)' }}>{t.table}</strong>
+                <ul style={{ margin: '2px 0 0', paddingLeft: 18, color: 'var(--slate-soft)' }}>
+                  {t.issues.map((issue, i) => <li key={i}>{issue}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
 
         {resultat && Object.entries(resultat).map(([tableKey, contenu]) => (
