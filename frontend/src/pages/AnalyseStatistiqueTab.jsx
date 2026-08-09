@@ -186,9 +186,12 @@ function ChampFormulaire({ schema, valeur, onChange }) {
 
 const EXPLICATIONS_ERREUR = [
   {
-    motif: /singular matrix/i,
+    motif: /singular matrix|modele impossible a ajuster|ne varie\(nt\) plus|correlation quasi-parfaite/i,
     titre: 'Modèle impossible à ajuster (colinéarité)',
-    explication: "Certaines covariables choisies sont trop liées entre elles (ou une catégorie ne varie plus) une fois les patients incomplets exclus. Le modèle ne peut pas isoler l'effet de chaque variable. Essayez de retirer une covariable catégorielle ou d'élargir la fenêtre de tolérance pour garder plus de patients.",
+    // Le backend identifie desormais precisement la variable ou la paire de
+    // variables fautive (voir check_multicollinearity dans test8_sep.py) :
+    // on affiche donc son message tel quel plutot qu'un texte generique.
+    explicationDynamique: true,
   },
   {
     motif: /perfect ?separation/i,
@@ -209,7 +212,11 @@ const EXPLICATIONS_ERREUR = [
 
 function explicationErreurClinique(message) {
   const trouvee = EXPLICATIONS_ERREUR.find((e) => e.motif.test(message || ''));
-  if (trouvee) return trouvee;
+  if (trouvee) {
+    return trouvee.explicationDynamique
+      ? { titre: trouvee.titre, explication: message }
+      : trouvee;
+  }
   return {
     titre: "L'analyse n'a pas pu aboutir",
     explication: message || "Une erreur inattendue est survenue pendant le calcul statistique.",

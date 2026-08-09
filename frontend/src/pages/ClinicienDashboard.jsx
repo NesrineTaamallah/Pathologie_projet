@@ -7,6 +7,7 @@ import OverviewTabClinicien from './OverviewTabClinicien';
 import RegistreSepTab from './RegistreSepTab';
 import RegistreEprTab from './RegistreEprTab';
 import EntitesMedicalesTab from './EntitesMedicalesTab';
+import Cim11Tab from './Cim11Tab';
 import { IconChart, IconUsers, IconFolder, IconLogout, IconWave } from '../components/Icons';
 
 const SIDEBAR_WIDTH = 248;
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { key: 'registre-epr', Icon: IconWave, label: 'Registre EPR', disabled: false },
   { key: 'patients', Icon: IconUsers, label: 'Patients', disabled: false },
   { key: 'entites', Icon: IconFolder, label: 'Entités Médicales', disabled: false },
+  { key: 'cim11', Icon: IconWave, label: 'CIM-11', disabled: false },
   { key: 'analyses', Icon: IconWave, label: 'Analyse Statistique', disabled: false },
 ];
 
@@ -231,6 +233,7 @@ export default function ClinicienDashboard() {
               onConsumed={() => setAlerteEntites(null)}
             />
           )}
+          {tab === 'cim11' && <Cim11Tab />}
         </div>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import os
 import sys
 
@@ -384,11 +383,66 @@ def prepare_data(
 
 
 def check_multicollinearity(df_model: pd.DataFrame, predictors: list) -> pd.DataFrame:
+    # --- Garde-fou : identifier la cause precise AVANT que
+    # variance_inflation_factor() ne plante avec un LinAlgError("Singular
+    # matrix") opaque. Deux cas frequents une fois le dropna() des cas
+    # complets applique sur un petit sous-echantillon :
+    #   1) une variable (typiquement categorielle : atteinte_medullaire)
+    #      ne varie plus du tout -> colonne constante -> matrice singuliere.
+    #   2) deux predicteurs deviennent parfaitement (ou quasi-parfaitement)
+    #      correles sur ce sous-echantillon.
+    n = len(df_model)
+
+    # 1) Variables sans variance (constantes) dans le sous-echantillon retenu.
+    variables_constantes = [
+        p for p in predictors if df_model[p].nunique(dropna=True) <= 1
+    ]
+    if variables_constantes:
+        details = "; ".join(
+            f"{p} = {df_model[p].iloc[0]!r} pour les {n} patients" for p in variables_constantes
+        )
+        raise ValueError(
+            "[VIF] Modele impossible a ajuster : "
+            f"{', '.join(variables_constantes)} ne varie(nt) plus une fois les patients "
+            f"incomplets exclus ({details}). Impossible d'estimer l'effet de cette variable. "
+            "Elargissez la fenetre TAP precoce pour garder plus de patients, ou retirez "
+            "temporairement cette covariable du modele."
+        )
+
+    # 2) Paires de predicteurs parfaitement (ou quasi-parfaitement) correles.
+    if n >= 2:
+        correlations = df_model[predictors].astype(float).corr().abs()
+        paires_colineaires = [
+            (correlations.columns[i], correlations.columns[j], correlations.iloc[i, j])
+            for i in range(len(predictors))
+            for j in range(i + 1, len(predictors))
+            if correlations.iloc[i, j] > 0.999
+        ]
+        if paires_colineaires:
+            details = "; ".join(f"{a} ~ {b} (r={r:.4f})" for a, b, r in paires_colineaires)
+            raise ValueError(
+                f"[VIF] Modele impossible a ajuster : correlation quasi-parfaite entre "
+                f"predicteurs sur ce sous-echantillon (n={n}) : {details}. Retirez l'une des "
+                "deux covariables ou elargissez la fenetre TAP precoce pour garder plus de "
+                "patients."
+            )
+
     X = sm.add_constant(df_model[predictors])
-    vif_data = pd.DataFrame({
-        "variable": X.columns,
-        "VIF": [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
-    })
+    try:
+        vif_data = pd.DataFrame({
+            "variable": X.columns,
+            "VIF": [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+        })
+    except np.linalg.LinAlgError as e:
+        # Filet de securite si la matrice est singuliere pour une raison non
+        # couverte par les deux verifications explicites ci-dessus.
+        raise ValueError(
+            f"[VIF] Modele impossible a ajuster : matrice singuliere sur n={n} patients "
+            f"apres exclusion des donnees incompletes ({predictors}). Cause non identifiee "
+            f"automatiquement (erreur numpy : {e}). Elargissez la fenetre TAP precoce ou "
+            "retirez une covariable pour verifier laquelle pose probleme."
+        ) from e
+
     logger.info("\n[VIF] Facteurs d'inflation de la variance (>5 = colinearite problematique) :\n"
                 + vif_data.to_string(index=False))
     return vif_data
@@ -515,12 +569,32 @@ def fit_and_summarize(df_model: pd.DataFrame, predictors: list, y_col: str):
     logger.info("=" * 70)
     logger.info("\n" + str(result.summary()))
     params = result.params
-    conf = result.conf_int()
-    conf.columns = ["IC95%_bas", "IC95%_haut"]
+    try:
+        conf = result.conf_int()
+        conf.columns = ["IC95%_bas", "IC95%_haut"]
+    except (np.linalg.LinAlgError, ValueError) as e:
+        # Cas frequent avec le fallback L1 (methode == "l1_fallback") : la
+        # Hessienne du modele n'a pas pu etre inversee (voir
+        # HessianInversionWarning juste avant dans les logs), generalement
+        # parce que le taux d'evenements est trop extreme pour l'effectif
+        # (ex. 90% d'evenements sur n=30 -> quasi-separation). Les IC95%
+        # ne sont alors pas calculables de facon fiable : on degrade
+        # proprement au lieu de laisser planter toute l'analyse.
+        logger.warning(
+            f"[modele] IC95% non calculables ({type(e).__name__}: {e}) -> methode='{method}', "
+            f"taux d'evenements = {100*y.mean():.1f}% sur n={len(y)}. Cause probable : "
+            "quasi-separation (effectif trop petit face au taux d'evenements observe). "
+            "IC affiches comme non disponibles (NaN)."
+        )
+        conf = pd.DataFrame(
+            {"IC95%_bas": np.nan, "IC95%_haut": np.nan}, index=params.index
+        )
+        method = f"{method}_ic_indisponible"
     or_table = pd.DataFrame({"OR": np.exp(params), "IC95%_bas": np.exp(conf["IC95%_bas"]), "IC95%_haut": np.exp(conf["IC95%_haut"]), "p_value": result.pvalues})
     logger.info("\n[Odds Ratios]\n" + or_table.to_string())
     logger.info(interpret_odds_ratios(or_table))
     return result, or_table, method
+
 
 
 def interpret_odds_ratios(or_table: pd.DataFrame) -> str:

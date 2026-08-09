@@ -15,6 +15,7 @@ const dossierRoutes = require('./routes/dossierRoutes');
 const dossierUploadRoutes = require('./routes/dossierUploadRoutes'); 
 const extractionRoutes = require('./routes/extractionRoutes'); 
 const entitesExtractionRoutes = require('./routes/entitesExtractionRoutes');
+const cim11Routes = require('./routes/cim11Routes');
 const app = express();
 
 
@@ -37,6 +38,7 @@ app.use('/api/dossiers', dossierUploadRoutes);
 app.use('/api/dossiers', dossierRoutes);
 app.use('/api/extraction', extractionRoutes);
 app.use(entitesExtractionRoutes);
+app.use(cim11Routes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Serveur démarré sur le port ${PORT}`));
