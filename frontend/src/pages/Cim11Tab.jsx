@@ -128,7 +128,7 @@ export default function Cim11Tab() {
             value={pseudonyme}
             onChange={(e) => setPseudonyme(e.target.value)}
             onBlur={() => chargerHistorique(pseudonyme.trim())}
-            placeholder="Pseudonyme patient (ex: SEP_MJ_001)"
+            placeholder="Pseudonyme patient "
             autoComplete="off"
             style={{
               padding: '9px 13px', borderRadius: 9, border: '1px solid var(--line)',
@@ -147,7 +147,7 @@ export default function Cim11Tab() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un diagnostic… (ex: epilepsie, sclerose en plaque, 8A61)"
+            placeholder="Rechercher un diagnostic… "
             autoComplete="off"
             style={{
               width: '100%', padding: '13px 16px 13px 40px', borderRadius: 11,

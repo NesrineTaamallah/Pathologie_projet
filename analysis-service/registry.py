@@ -149,10 +149,11 @@ from epr.test6_consanguinite_etiologie import PARAMETRES_SCHEMA as EPR6_PARAMETR
 
 
 def run_epr7(engine, config):
-    # OUT_DIR est auto-redirige vers le dossier temporaire par
-    # run_original_script (voir script_runner._possede_constante) ; seul
-    # DB_URI doit etre substitue explicitement ici.
-    return run_original_script(_epr("test7_epr.py"), overrides={"DB_URI": _db_uri()})
+    from epr.test7_qi_frequence_crises import run as _run
+    return _run(engine, config)
+
+
+from epr.test7_qi_frequence_crises import PARAMETRES_SCHEMA as EPR7_PARAMETRES_SCHEMA
 
 
 

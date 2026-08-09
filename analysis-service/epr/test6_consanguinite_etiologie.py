@@ -1,25 +1,4 @@
-"""
-EPR test 6 — Consanguinité parentale x Étiologie génétique confirmée (mode AR).
 
-Converti depuis test_analyse_statistique/EPR/test6_epr.py vers le pattern
-structuré (voir epr/test1_etiologie_survie.py pour la même démarche sur le
-test 1). `run(engine, config)` retourne toujours
-{"notes", "figures", "tableau", "resume_stats"}, exploitable directement
-par le frontend (mêmes composants que pour les tests SEP).
-
-Corrections méthodologiques reprises du script original :
-  1. Indépendance des observations : les patients sont regroupés par
-     "famille" (heuristique sur le pseudonyme) ; analyse principale =
-     1 observation/famille (dédoublonnée) + analyse de sensibilité GEE
-     (structure de corrélation intra-famille) sur toutes les observations.
-  2. `etiologie_toute` utilise DISTINCT ON (pseudonyme) pour ne garder
-     qu'une ligne par patient même en cas d'anomalie de saisie.
-  3. Test de tendance de Cochran-Armitage (effet dose-réponse) en
-     complément du Chi² r×c.
-  4. Flux d'inclusion (style STROBE) rapporté explicitement dans les notes.
-  5. Graphe de proportions : % d'étiologie AR confirmée par groupe de
-     consanguinité.
-"""
 
 import os
 import re
@@ -40,11 +19,6 @@ RESULTATS_DIR = os.environ.get(
 
 ALPHA = 0.05
 
-# --- Requête principale d'extraction --------------------------------------
-# Priorité 5 (convention NULL/'NA') : on exclut les deux du champ
-# consanguinite_parentale avant tout test statistique.
-# DISTINCT ON (pseudonyme) dans etiologie_toute pour ne jamais dupliquer un
-# patient si plusieurs lignes "principale=TRUE" existent (anomalie de saisie).
 SQL_EXTRACTION = """
 WITH patients_epr AS (
     SELECT pseudonyme
@@ -98,7 +72,6 @@ INNER JOIN etiologie_toute et ON et.pseudonyme = p.pseudonyme
 LEFT JOIN  etiologie_ar    ar ON ar.pseudonyme = p.pseudonyme;
 """
 
-# --- Requête de contrôle qualité / flux d'inclusion (style STROBE) --------
 SQL_QC = """
 SELECT
     (SELECT COUNT(*) FROM patients WHERE registre = 'EPR')
@@ -132,22 +105,14 @@ def extraire_depuis_postgres(engine):
     df = pd.read_sql(SQL_EXTRACTION, engine)
     qc = pd.read_sql(SQL_QC, engine)
 
-    # /!\ epr_antecedents.consanguinite_parentale est de type BOOLEAN dans le
-    # schéma réel (schema_registre.sql), pas la chaîne 'Oui'/'Non' supposée
-    # par le script original. On recode ici, une seule fois, pour que tout
-    # le pipeline en aval (crosstab, Cochran-Armitage, GEE) puisse continuer
-    # à travailler avec les libellés 'Oui'/'Non' sans autre changement.
+    
     df["consanguinite_parentale"] = df["consanguinite_parentale"].map({True: "Oui", False: "Non"})
 
     return df, qc.iloc[0].to_dict()
 
 
 def test_tendance_cochran_armitage(df, col_categorie, ordre_scores, col_binaire):
-    """
-    ordre_scores : dict {categorie: score_ordinal_croissant}
-    col_binaire  : colonne 0/1 (1 = évènement, ex. AR_confirmee)
-    Retourne None si le test est dégénéré (pas de variance).
-    """
+    
     lignes = []
     for cat, score in ordre_scores.items():
         sous = df[df[col_categorie] == cat]
@@ -180,9 +145,7 @@ def test_tendance_cochran_armitage(df, col_categorie, ordre_scores, col_binaire)
 
 
 def _sauvegarder_resultats_sur_disque(dossier: str, notes: Notes, tables: dict, figures_fig: list):
-    """Écrit sur disque, dans `dossier`, TOUT ce que produisait le script
-    original : notes.txt (log complet), un CSV par tableau, un PNG par figure.
-    Retourne le chemin absolu du dossier créé."""
+    
     os.makedirs(dossier, exist_ok=True)
 
     with open(os.path.join(dossier, "notes.txt"), "w", encoding="utf-8") as f:
@@ -199,7 +162,6 @@ def _sauvegarder_resultats_sur_disque(dossier: str, notes: Notes, tables: dict, 
 
 
 def run(engine, config: dict) -> dict:
-    """Point d'entrée appelé par l'API. `config` non utilisé (aucun paramètre pour ce test)."""
     notes = Notes()
 
     df, qc = extraire_depuis_postgres(engine)
@@ -223,18 +185,7 @@ def run(engine, config: dict) -> dict:
     if len(df) < 10:
         raise ValueError(f"Effectif insuffisant pour ce test (n={len(df)} < 10).")
 
-    # ------------------------------------------------------------------
-    # Structure familiale (heuristique sur le pseudonyme)
-    # ------------------------------------------------------------------
-    # /!\ L'heuristique "on retire le suffixe numérique final" ne vaut que
-    # pour les vrais dossiers cliniques nommés par fratrie (ex. EPR_MBH_001
-    # / EPR_MBH_002). Elle ne doit PAS s'appliquer à la cohorte simulée
-    # EPR_SIM_0001..EPR_SIM_0200 : ce sont 200 patients INDÉPENDANTS avec une
-    # numérotation séquentielle, pas des membres de fratrie. Sans cette
-    # exception, tous les patients EPR_SIM_xxxx s'effondrent sur un seul
-    # famille_id="EPR_SIM", ce qui réduit artificiellement l'effectif
-    # dédoublonné à une poignée de "familles" et rend le Chi²/OR/Cramér's V
-    # incalculables (NaN -> null côté API).
+    
     df["famille_id"] = df["pseudonyme"].apply(
         lambda x: x if re.match(r"^EPR_SIM_\d+$", x) else re.sub(r"_\d+$", "", x)
     )
@@ -251,7 +202,6 @@ def run(engine, config: dict) -> dict:
     df["est_AR_confirmee"] = (df["groupe_etiologique"] == "AR_confirmee").astype(int)
     df["consanguinite_bin"] = (df["consanguinite_parentale"] == "Oui").astype(int)
 
-    # Analyse principale = 1 seule observation par famille
     df_dedup = (
         df.sort_values("pseudonyme")
           .drop_duplicates(subset="famille_id", keep="first")
@@ -260,9 +210,7 @@ def run(engine, config: dict) -> dict:
     notes(f"\nN avant dédoublonnage familial : {len(df)}")
     notes(f"N après dédoublonnage familial (analyse principale) : {len(df_dedup)}")
 
-    # ------------------------------------------------------------------
-    # Analyse principale : Chi² sur données dédoublonnées (1/famille)
-    # ------------------------------------------------------------------
+    
     table_contingence = pd.crosstab(df_dedup["consanguinite_parentale"], df_dedup["groupe_etiologique"])
     table_contingence = table_contingence.reindex(index=["Oui", "Non"], columns=["AR_confirmee", "Autre_etiologie"]).fillna(0)
 
@@ -271,11 +219,7 @@ def run(engine, config: dict) -> dict:
     notes("=" * 70)
     notes(table_contingence.to_string())
 
-    # Garde-fou : chi2_contingency lève une erreur peu explicite
-    # ("expected frequencies has a zero element") dès qu'une ligne ou une
-    # colonne entière est à zéro (ex. aucun patient AR_confirmee dans
-    # l'échantillon dédoublonné). On le détecte ici pour donner un message
-    # clair plutôt que de laisser planter l'analyse.
+    
     lignes_vides = table_contingence.sum(axis=1) == 0
     colonnes_vides = table_contingence.sum(axis=0) == 0
     if lignes_vides.any() or colonnes_vides.any():
@@ -342,9 +286,7 @@ def run(engine, config: dict) -> dict:
     notes("=" * 70)
     notes(f"V = {cramers_v:.3f}  (repère : ~0.1 faible / ~0.3 modérée / ~0.5+ forte)")
 
-    # ------------------------------------------------------------------
-    # Analyse de sensibilité : GEE (structure de corrélation familiale)
-    # ------------------------------------------------------------------
+    
     notes("\n" + "=" * 70)
     notes("ANALYSE DE SENSIBILITÉ : GEE (structure familiale, Exchangeable)")
     notes("=" * 70)
@@ -383,9 +325,7 @@ def run(engine, config: dict) -> dict:
         notes(f"GEE non calculé (erreur : {err}). "
               f"Vérifier l'installation de statsmodels et la taille de l'échantillon.")
 
-    # ------------------------------------------------------------------
-    # Test de tendance de Cochran-Armitage (effet dose-réponse)
-    # ------------------------------------------------------------------
+    
     notes("\n" + "=" * 70)
     notes("TEST DE TENDANCE DE COCHRAN-ARMITAGE (effet dose-réponse)")
     notes("=" * 70)
@@ -395,12 +335,7 @@ def run(engine, config: dict) -> dict:
     df_dedup["categorie_ordinale"] = np.where(
         df_dedup["consanguinite_parentale"] == "Non", "Non", df_dedup["consanguinite_degre"]
     )
-    # /!\ Les données réelles stockent le degré sans accent ('1er degre',
-    # '2eme degre', '3eme degre' — cf. seed_200_patients.sql), alors que le
-    # script original utilisait des clés accentuées ('1er degré'...). On
-    # normalise ici (accents retirés, "2e"/"2eme" -> "2e") pour que le
-    # test de tendance retrouve bien ces catégories au lieu de les compter
-    # silencieusement comme "hors barème" (0 partout, sans message d'erreur).
+    
     def _normaliser_degre(valeur):
         if pd.isna(valeur):
             return valeur
@@ -440,9 +375,7 @@ def run(engine, config: dict) -> dict:
     else:
         notes("Test de tendance non calculable (effectifs insuffisants ou dégénérés).")
 
-    # ------------------------------------------------------------------
-    # Graphes
-    # ------------------------------------------------------------------
+    
     figures_base64 = []
     figures_a_sauvegarder = []
 
@@ -489,9 +422,7 @@ def run(engine, config: dict) -> dict:
         figures_a_sauvegarder.append(("graphique_tendance_degre", fig3))
         figures_base64.append(figure_to_base64(fig3))
 
-    # ------------------------------------------------------------------
-    # Tableau de résultats (exploité par le frontend) + resume_stats
-    # ------------------------------------------------------------------
+    
     lignes_resultats = [
         {"indicateur": "N_avant_dedoublonnage", "valeur": len(df)},
         {"indicateur": "N_apres_dedoublonnage", "valeur": len(df_dedup)},
