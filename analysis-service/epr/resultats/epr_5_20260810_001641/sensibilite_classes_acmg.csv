@@ -1,0 +1,4 @@
+,scenario_ACMG,classes,n_patients,n_genes_distincts
+0,Classe V uniquement (strict),['Classe V'],20,12
+1,Classe IV + V (retenu),"['Classe IV', 'Classe V']",41,13
+2,"Classe III + IV + V (élargi, exploratoire)","['Classe III', 'Classe IV', 'Classe V']",47,13

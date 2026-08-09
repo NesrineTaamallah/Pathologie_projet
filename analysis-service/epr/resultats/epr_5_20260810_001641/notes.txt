@@ -1,0 +1,96 @@
+==============================================================================
+Analyse de sous-groupes par gène — corrélation génotype-phénotype (EPR)
+Classes ACMG retenues comme variant causal : Classe IV/Classe V
+Date de génération : 2026-08-10 00:16
+==============================================================================
+
+[INFO] 41 patients avec variant causal (classes ACMG retenues : ['Classe IV', 'Classe V'])
+[INFO] 20 patients exclus des comparaisons par gène (sous-groupe < 5 patients). Gènes exclus : ['CDKL5', 'DEPDC5', 'GRIN1', 'GRIN2A', 'KCNT1', 'MECP2', 'SCN2A', 'SCN8A', 'TSC2']
+[INFO] 21 patients retenus après filtre n >= 5 par gène
+[INFO] Sous-groupes analysés : ['GABRA1', 'KCNQ2', 'SCN1A', 'STXBP1']
+
+==============================================================================
+TABLE 1 — Statistiques descriptives par sous-groupe (gène)
+==============================================================================
+                               Variable            GABRA1              KCNQ2              SCN1A             STXBP1           Ensemble
+                             N patients                 5                  5                  5                  6                 21
+frequence_moyenne_mois, médiane [Q1-Q3]   13.0 [9.3-32.1]    11.8 [9.6-12.8]   15.4 [10.2-17.7]     9.9 [8.2-11.6]    11.8 [9.3-15.4]
+ age_debut_crises_mois, médiane [Q1-Q3] 45.6 [35.8-139.0] 109.1 [84.0-162.9] 120.0 [70.8-125.7] 112.5 [98.8-128.7] 109.1 [68.9-139.0]
+            --- type_crise_ilae2017 ---               NaN                NaN                NaN                NaN                NaN
+                          Focale, n (%)         3 (60.0%)          4 (80.0%)          1 (20.0%)          4 (66.7%)         12 (57.1%)
+                     Generalisee, n (%)         2 (40.0%)           0 (0.0%)          4 (80.0%)          2 (33.3%)          8 (38.1%)
+                        Inconnue, n (%)          0 (0.0%)          1 (20.0%)           0 (0.0%)           0 (0.0%)           1 (4.8%)
+            --- statut_calcule_ilae ---               NaN                NaN                NaN                NaN                NaN
+                           False, n (%)        5 (100.0%)         5 (100.0%)         5 (100.0%)         6 (100.0%)        21 (100.0%)
+
+==============================================================================
+Gène vs type de crise (ILAE 2017)
+==============================================================================
+type_crise_ilae2017  Focale  Generalisee  Inconnue
+gene_teste                                        
+GABRA1                    3            2         0
+KCNQ2                     4            0         1
+SCN1A                     1            4         0
+STXBP1                    4            2         0
+
+Chi² d'indépendance : statistique=9.217, p=0.1618, n=21
+V de Cramér (taille d'effet) = 0.278 (faible)
+
+==============================================================================
+Gène vs fréquence des crises (crises/mois)
+==============================================================================
+Kruskal-Wallis : H=2.088, p=0.5543, n=21, epsilon²=-0.054
+
+==============================================================================
+Gène vs âge de début des crises (mois)
+==============================================================================
+Kruskal-Wallis : H=1.395, p=0.7068, n=21, epsilon²=-0.094
+
+==============================================================================
+Gène vs pharmacorésistance (régression logistique, ajustée âge début)
+==============================================================================
+Référence : STXBP1 | n = 21
+                       coefficient      OR  IC95_inf  IC95_sup  p_value
+const                     -20.6454  0.0000       0.0       inf      1.0
+age_debut_crises_mois      -0.2780  0.7573       0.0       inf      1.0
+gene_teste_GABRA1          -4.5062  0.0110       0.0       inf      1.0
+gene_teste_KCNQ2            1.9438  6.9855       0.0       inf      1.0
+gene_teste_SCN1A            0.5930  1.8093       0.0       inf      1.0
+
+==============================================================================
+Synthèse avec correction pour comparaisons multiples (Benjamini-Hochberg)
+==============================================================================
+                              variable                    methode  p_value  p_value_fdr significatif_apres_fdr  n  taille_effet nom_taille_effet
+                   type_crise_ilae2017        Chi² d'indépendance 0.161755     0.970527                  False 21      0.277778      V de Cramér
+                frequence_moyenne_mois             Kruskal-Wallis 0.554281     1.000000                  False 21     -0.053629         epsilon²
+                 age_debut_crises_mois             Kruskal-Wallis 0.706753     1.000000                  False 21     -0.094423         epsilon²
+pharmacoresistance (gene_teste_GABRA1) Régression logistique (OR) 1.000000     1.000000                  False 21           NaN             None
+ pharmacoresistance (gene_teste_KCNQ2) Régression logistique (OR) 1.000000     1.000000                  False 21           NaN             None
+ pharmacoresistance (gene_teste_SCN1A) Régression logistique (OR) 1.000000     1.000000                  False 21           NaN             None
+
+==============================================================================
+Analyse de sensibilité — N_MIN ∈ [3, 5, 8, 10]
+==============================================================================
+ n_min  n_genes_inclus  n_patients                  variable  statistique_H  p_value  epsilon2
+     3               8          33      fréquence des crises         7.5123   0.3776    0.0205
+     3               8          33   âge de début des crises         6.2916   0.5061   -0.0283
+     3               8          33 type de crise (ILAE 2017)        16.4807   0.2849    0.1817
+     5               4          21      fréquence des crises         2.0883   0.5543   -0.0536
+     5               4          21   âge de début des crises         1.3948   0.7068   -0.0944
+     5               4          21 type de crise (ILAE 2017)         9.2167   0.1618    0.2778
+     8               0           0      fréquence des crises            NaN      NaN       NaN
+     8               0           0   âge de début des crises            NaN      NaN       NaN
+    10               0           0      fréquence des crises            NaN      NaN       NaN
+    10               0           0   âge de début des crises            NaN      NaN       NaN
+
+Interprétation : si le statut de significativité (p<0.05) et le sens de l'effet (epsilon²/statistique) restent stables à travers la grille de N_MIN, la conclusion n'est pas un artefact du seuil choisi.
+
+==============================================================================
+Analyse de sensibilité — seuil ACMG retenu comme variant causal
+==============================================================================
+                             scenario_ACMG                           classes  n_patients  n_genes_distincts
+              Classe V uniquement (strict)                        [Classe V]          20                 12
+                    Classe IV + V (retenu)             [Classe IV, Classe V]          41                 13
+Classe III + IV + V (élargi, exploratoire) [Classe III, Classe IV, Classe V]          47                 13
+
+[NOTE] Le scénario 'Classe III+IV+V' est exploratoire (VUS = variant de signification incertaine) : à ne pas utiliser pour des conclusions cliniques, seulement pour juger de la sensibilité de la taille de cohorte.

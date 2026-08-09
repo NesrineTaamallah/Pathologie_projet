@@ -125,11 +125,19 @@ from epr.test3_type_crise_anova import PARAMETRES_SCHEMA as EPR3_PARAMETRES_SCHE
 
 
 def run_epr4(engine, config):
-    return run_original_script(_epr("test4_epr.py"), overrides={"DB_URI": _db_uri()})
+    from epr.test4_regression_etiologie_gene import run as _run
+    return _run(engine, config)
+
+
+from epr.test4_regression_etiologie_gene import PARAMETRES_SCHEMA as EPR4_PARAMETRES_SCHEMA
 
 
 def run_epr5(engine, config):
-    return run_original_script(_epr("test5_epr.py"), overrides={"DB_URI": _db_uri()})
+    from epr.test5_genotype_phenotype import run as _run
+    return _run(engine, config)
+
+
+from epr.test5_genotype_phenotype import PARAMETRES_SCHEMA as EPR5_PARAMETRES_SCHEMA
 
 
 def run_epr6(engine, config):
@@ -204,13 +212,14 @@ ANALYSES = {
                               "crise, classifié selon ILAE 2017 (ANOVA avec comparaisons post-hoc de Tukey).",
               "parametres_schema": EPR3_PARAMETRES_SCHEMA, "run": run_epr3},
     "epr_4": {"registre": "EPR", "titre": "Régression développementale selon l'étiologie et le gène impliqué",
-              "description": "Recherche une association entre la survenue d'une régression développementale "
-                              "et la catégorie étiologique ou le gène causal identifié (tests du chi², odds ratio).",
-              "parametres_schema": {}, "run": run_epr4},
+          "description": "Recherche une association entre la survenue d'une régression développementale "
+                          "et la catégorie étiologique ou le gène causal identifié (tests du chi², odds ratio).",
+          "parametres_schema": {}, "run": run_epr4},
     "epr_5": {"registre": "EPR", "titre": "Corrélation génotype-phénotype",
-              "description": "Étudie le lien entre le gène ou la classe de variant identifié (classification "
-                              "ACMG) et le phénotype clinique observé, par famille fonctionnelle de gène.",
-              "parametres_schema": {}, "run": run_epr5},
+            "description": "Étudie le lien entre le gène ou la classe de variant identifié (classification "
+                            "ACMG) et le phénotype clinique observé, par famille fonctionnelle de gène.",
+            "parametres_schema": {}, "run": run_epr5},
+
     "epr_6": {"registre": "EPR", "titre": "Consanguinité parentale et étiologie génétique",
               "description": "Recherche un gradient entre le degré de consanguinité parentale et la "
                               "probabilité d'une étiologie génétique à transmission autosomique récessive "

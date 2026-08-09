@@ -322,26 +322,28 @@ function AideTest({ titre, description, parametresSchema, accent }) {
             boxShadow: '0 12px 28px -12px rgba(17, 24, 39, 0.28)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
-            {/* En-tête fixe : ne défile pas avec le contenu */}
+            {/* En-tête fixe : titre du test, ne défile jamais */}
             <div style={{ padding: '14px 16px 10px', flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
               <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{titre}</div>
               {description && <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--slate)' }}>{description}</p>}
             </div>
 
-            {/* Corps défilant : taille de la fenêtre fixe, contenu glissant */}
-            <div style={{
-              flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
-              padding: '10px 16px 14px',
-              display: 'flex', flexDirection: 'column', gap: 10,
-            }}>
-              {parametresSchema && Object.keys(parametresSchema).length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{
-                    position: 'sticky', top: -1, background: 'var(--card)', paddingBottom: 2, zIndex: 1,
-                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: 'var(--slate-soft)',
-                  }}>
-                    Comment régler les paramètres
-                  </div>
+            {parametresSchema && Object.keys(parametresSchema).length > 0 ? (
+              <>
+                {/* Sous-en-tête fixe, hors zone de défilement : jamais recouvert ni recouvrant */}
+                <div style={{
+                  flexShrink: 0, padding: '9px 16px', background: 'var(--paper)', borderBottom: '1px solid var(--line)',
+                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: 'var(--slate-soft)',
+                }}>
+                  Comment régler les paramètres
+                </div>
+
+                {/* Corps défilant : fenêtre de taille fixe, contenu glissant */}
+                <div style={{
+                  flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
+                  padding: '12px 16px 14px',
+                  display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
                   {Object.entries(parametresSchema).map(([nomChamp, schema]) => {
                     const { texte, recommande } = explicationParametre(nomChamp);
                     return (
@@ -366,12 +368,14 @@ function AideTest({ titre, description, parametresSchema, accent }) {
                     );
                   })}
                 </div>
-              ) : (
+              </>
+            ) : (
+              <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '12px 16px 14px' }}>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-soft)', fontStyle: 'italic' }}>
                   Ce test ne comporte aucun paramètre réglable.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </>
       )}

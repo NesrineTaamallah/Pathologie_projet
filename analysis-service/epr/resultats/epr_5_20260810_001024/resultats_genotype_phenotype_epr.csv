@@ -1,0 +1,7 @@
+,variable,methode,statistique,p_value,n,taille_effet,nom_taille_effet,p_value_fdr,significatif_apres_fdr
+0,type_crise_ilae2017,Chi² d'indépendance,9.216666666666667,0.16175455034082953,21,0.2777777777777778,V de Cramér,0.9705273020449772,False
+1,frequence_moyenne_mois,Kruskal-Wallis,2.088311688311677,0.5542810053037968,21,-0.053628724216960175,epsilon²,0.9999999986741926,False
+2,age_debut_crises_mois,Kruskal-Wallis,1.3948051948052012,0.7067528730750325,21,-0.09442322383498816,epsilon²,0.9999999986741926,False
+3,pharmacoresistance (gene_teste_GABRA1),Régression logistique (OR),0.01104065158363324,0.9999999859858939,21,,,0.9999999986741926,False
+4,pharmacoresistance (gene_teste_KCNQ2),Régression logistique (OR),6.985478991638943,0.9999999939244073,21,,,0.9999999986741926,False
+5,pharmacoresistance (gene_teste_SCN1A),Régression logistique (OR),1.809328698690077,0.9999999986741926,21,,,0.9999999986741926,False
