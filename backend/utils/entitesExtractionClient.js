@@ -117,4 +117,6 @@ module.exports = {
   extraireEntitesMedicales,
   extraireEntitesMedicalesStreaming,
   chargerEtatInitialDepuisDB,
+  TABLES_SEP,
+  TABLES_EPR,
 };
