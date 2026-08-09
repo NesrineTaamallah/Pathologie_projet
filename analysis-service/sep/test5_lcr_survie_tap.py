@@ -1,23 +1,4 @@
-"""
-Refactor de test_analyse_statistique/SEP/test5_sep.py (bandes oligoclonales /
-index IgG au LCR initial, TAP, et survie sans évènement) en fonction
-appelable par l'API, sans input()/CONFIG en tête de fichier ni plt.show().
 
-La logique statistique (Mann-Whitney sur le TAP, choix Poisson vs Binomiale
-Négative selon la dispersion de Pearson, régression de Cox tronquée par
-horizon + correction de Bonferroni, Kaplan-Meier) est STRICTEMENT IDENTIQUE
-au script original :
-  - les choix faits via la constante CONFIG viennent de `config` (formulaire)
-  - les print() vont dans `notes`
-  - les figures sont encodées en base64 au lieu d'un plt.show()/savefig
-  - les tableaux (Mann-Whitney, modèle de comptage, Cox par horizon) sont
-    retournés en JSON structuré
-
-AUCUN écart de schéma constaté ici (contrairement à test4) : SQL_EXTRACTION
-n'utilise aucune arithmétique de date type EXTRACT(EPOCH FROM date - date)
-qui casse sous Postgres — les durées sont calculées côté pandas après
-pd.to_datetime(), pas en SQL.
-"""
 import numpy as np
 import pandas as pd
 from scipy import stats

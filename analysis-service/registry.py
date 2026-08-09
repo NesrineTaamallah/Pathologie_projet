@@ -1,4 +1,3 @@
-
 import os
 from script_runner import run_original_script
 
@@ -71,13 +70,19 @@ from sep.test5_lcr_survie_tap import PARAMETRES_SCHEMA as SEP5_PARAMETRES_SCHEMA
 
 
 def run_sep6(engine, config):
-    
-    return run_original_script(_sep("test6_sep.py"), env_overrides=PG_ENV)
+    from sep.test6_consanguinite import run as _run
+    return _run(engine, config)
+
+
+from sep.test6_consanguinite import PARAMETRES_SCHEMA as SEP6_PARAMETRES_SCHEMA
 
 
 def run_sep8(engine, config):
-   
-    return run_original_script(_sep("test8_sep.py"), env_overrides=PG_ENV)
+    from sep.test8_severite_prediction import run as _run
+    return _run(engine, config)
+
+
+from sep.test8_severite_prediction import PARAMETRES_SCHEMA as SEP8_PARAMETRES_SCHEMA
 
 
 
@@ -133,10 +138,10 @@ ANALYSES = {
               "parametres_schema": SEP5_PARAMETRES_SCHEMA, "run": run_sep5},
     "sep_6": {"registre": "SEP", "titre": "Consanguinité, sexe et forme évolutive",
               "description": "Tests chi²/Fisher sur antécédents et présentation clinique.",
-              "parametres_schema": {}, "run": run_sep6},
+              "parametres_schema": SEP6_PARAMETRES_SCHEMA, "run": run_sep6},
     "sep_8": {"registre": "SEP", "titre": "Prédiction de sévérité (modèle validé, VIF, bootstrap)",
               "description": "Modèle de sévérité SEP avec validation croisée et calibration.",
-              "parametres_schema": {}, "run": run_sep8},
+              "parametres_schema": SEP8_PARAMETRES_SCHEMA, "run": run_sep8},
 
     "epr_1": {"registre": "EPR", "titre": "Étiologie/pharmacorésistance — survie",
               "description": "Kaplan-Meier / Cox, univarié ou multivarié.",
@@ -162,4 +167,3 @@ ANALYSES = {
               "parametres_schema": {}, "run": run_epr5},
 
 }
-

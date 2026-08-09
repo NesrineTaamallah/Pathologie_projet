@@ -3110,24 +3110,3 @@ def extract_entites_streaming(req: ExtractionRequestStreaming):
     return resultat
 
 
-# NOTE — comment fournir `etat_initial` (mémoire base de données) :
-# Côté Node (entitesExtractionClient.js), avant d'appeler cette route :
-#   1. SELECT * des tables sep_*/epr_* deja enregistrees pour ce patient_id
-#      (les memes tables que schema_registre.sql, memes noms de colonnes que
-#      les champs des schemas YAML ci-dessus)
-#   2. Construire { "sep_identification_clinique": {...}, "sep_edss_visites": [...], ... }
-#      (objet pour les tables non repetees, liste d'objets pour les tables repetees)
-#   3. L'envoyer dans le corps de la requete comme `etat_initial`
-# Le LLM verra alors ces valeurs comme "deja connu" des le premier chunk
-# (meme prompt/regles que pour l'etat accumule au fil des chunks), et ne les
-# dupliquera pas / completera les champs manquants au lieu de recreer une
-# entree, exactement comme demande.
-#
-# NOTE — "vrai" live token-par-chunk (optionnel, pour plus tard) :
-# Cette route recalcule tout l'etat streaming a chaque appel HTTP (a partir
-# de etat_initial + tous les chunks envoyes). Pour un vrai live ou un seul
-# NOUVEAU chunk arrive a la fois sans renvoyer tout l'historique, il faudrait
-# persister l'etat intermediaire entre deux appels (memoire process ou table
-# Postgres dediee) et exposer une route /extract-entites-streaming/chunk qui
-# ne traite qu'un seul nouveau chunk a la fois. Dis-moi si tu veux cette
-# version plus tard.

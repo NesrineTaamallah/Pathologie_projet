@@ -151,21 +151,6 @@ export default function ExtractionEntitesPanel({
         }}>
           {texte || <span className="hint">Texte vide.</span>}
         </div>
-        {aVerifier.length > 0 && (
-          <div style={{ borderRadius: 10, border: '1.5px solid #f0c36d', background: '#fdf6e6', padding: '8px 12px' }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <IconAlert size={12} /> À vérifier ({aVerifier.reduce((n, t) => n + t.issues.length, 0)})
-            </span>
-            {aVerifier.map((t) => (
-              <div key={t.table} style={{ fontSize: 11, marginTop: 4 }}>
-                <strong>{t.table}</strong>
-                <ul style={{ margin: '2px 0 0', paddingLeft: 16, color: 'var(--slate-soft)' }}>
-                  {t.issues.map((issue, i) => <li key={i}>{issue}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* --- Colonne droite : entités extraites (édition) --- */}
