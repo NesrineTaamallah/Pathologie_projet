@@ -69,14 +69,6 @@ export default function ExtractionCoordonneesPanel({
       setError('Aucun dossier cible pour enregistrer ces coordonnées.');
       return;
     }
-    if (!fields.numero_dossier || !fields.numero_dossier.trim()) {
-      setError('Le numéro de dossier est obligatoire.');
-      return;
-    }
-    if (!fields.nom_prenom || !fields.nom_prenom.trim()) {
-      setError('Le nom et prénom sont obligatoires.');
-      return;
-    }
     setSaving(true);
     setError('');
     try {
