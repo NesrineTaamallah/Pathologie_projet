@@ -11,7 +11,7 @@ from llama_cpp import Llama
 MODEL_PATH = r"C:\hf-cache\qwen3-8b-gguf\Qwen3-8B-Q4_K_M.gguf"
 
 CHAMPS = [
-    "numero_dossier", "nom_prenom", "date_naissance", "adresse", "origine",
+    "nom_prenom", "date_naissance", "adresse", "origine",
     "telephone", "cin", "num_cnam", "nom_prenom_pere", "nom_prenom_mere",
     "frere", "soeur", "autre_antecedent",
 ]
@@ -31,7 +31,6 @@ class EntityType(str, Enum):
     DATE_NAISSANCE = "DATE_NAISSANCE"
     CIN = "CIN"
     NUM_CNAM = "NUM_CNAM"
-    NUM_DOSSIER = "NUM_DOSSIER"
     TELEPHONE = "TELEPHONE"
     ORIGINE = "ORIGINE"
     ADRESSE_PATIENT = "ADRESSE_PATIENT"
@@ -146,7 +145,7 @@ def _charger_modele():
 
 
 # ============================================================
-# 3. Prompt systeme (identique au notebook)
+# 3. Prompt systeme (identique au notebook, NUM_DOSSIER retire)
 # ============================================================
 
 _EXTRACTOR_SYSTEM_PROMPT = """### ROLE
@@ -163,15 +162,17 @@ Si les 3 checks passent, extrait. Sinon, n'extrait pas.
 
 ---
 
-### LES 8 TYPES D'ENTITES
+### LES 7 TYPES D'ENTITES
 
 **NOM_PRENOM**
 - Nom et/ou prenom d'une personne physique, reelle, nommement designee.
 - N'inclut JAMAIS : titre (Dr., Pr., Mme, M.), lien de parente ("le pere", "sa soeur"), fonction.
+- N'inclut JAMAIS un identifiant ou numero de dossier patient (ex. "EPR-AZ-004", "SEP_MJ_001", "D-2024-118", tout code alphanumerique avec tirets ou underscores) : ce n'est pas un nom de personne, quelle que soit sa position dans le texte. Un nom_prenom valide est un nom de personne en toutes lettres (ex. "Mehdi Jendoubi"), jamais un code.
 - Inclut toute personne nommee avec un titre ou une fonction soignante (medecin traitant, specialiste consulte, personnel medical cite par son nom) — extraire le nom SANS le titre, avec role=MEDECIN. Ceci s'applique de facon SYSTEMATIQUE, a chaque occurrence, pas seulement si le contexte semble important.
 - Exemple positif : "le pere Mohamed Gharbi" -> "Mohamed Gharbi"
 - Exemple positif : "suivi par le Dr. Salma Ben Youssef" -> "Salma Ben Youssef", role=MEDECIN
 - Exemple negatif : "Dr. Amira Kraoua" seule mention sans autre contexte -> quand meme extraire "Amira Kraoua", role=MEDECIN (un professionnel nomme reste une personne identifiable)
+- Exemple negatif : "il s'agit de l'enfant EPR-AZ-004" -> ne rien extraire pour EPR-AZ-004 (identifiant de dossier, pas un nom)
 
 **DATE_NAISSANCE**
 - Date calendaire COMPLETE (jour + mois + annee) referant EXPLICITEMENT a un evenement de naissance ("ne(e) le", "date de naissance", "DN", "venu(e) au monde le"...).
@@ -179,7 +180,7 @@ Si les 3 checks passent, extrait. Sinon, n'extrait pas.
 - N'EST PAS une date de naissance (donc NE PAS EXTRAIRE, quel que soit le type) :
   - une duree/age ("3 ans", "18 mois", "a l'age de X ans") — ce n'est pas une date calendaire, ne l'etiquette dans AUCUNE categorie ;
   - une date liee a autre chose qu'une naissance (dossier ouvert, consultation, diagnostic, admission, rendez-vous...) — cette date n'est simplement PAS une entite a extraire, quelle que soit sa proximite avec un autre mot-cle comme "dossier" ou "numero".
-- Exemple negatif : "dossier ouvert le 12/01/2024" -> ne rien extraire (ni DATE_NAISSANCE, ni NUM_DOSSIER : une date n'est jamais un identifiant)
+- Exemple negatif : "dossier ouvert le 12/01/2024" -> ne rien extraire
 - Exemple negatif : "premiere crise a l'age de 3 ans, actuellement agee de 7 ans" -> ne rien extraire, aucun des deux ages n'est une date de naissance
 
 **CIN**
@@ -187,10 +188,6 @@ Si les 3 checks passent, extrait. Sinon, n'extrait pas.
 
 **NUM_CNAM**
 - Identifiant d'assurance maladie / CNAM, numerique ou alphanumerique, avec ou sans prefixe.
-
-**NUM_DOSSIER**
-- Identifiant administratif du dossier medical, alphanumerique, souvent avec prefixe/tirets (ex : "D-2024-118").
-- Ne confonds JAMAIS un identifiant avec une date : si la valeur associee au mot "dossier"/"numero" est une date calendaire, ce n'est pas un NUM_DOSSIER, et ce n'est extrait dans aucune autre categorie sauf si un lien explicite a la naissance existe.
 
 **TELEPHONE**
 - Numero de telephone, tout format (avec ou sans indicatif, espace ou non).
@@ -202,9 +199,12 @@ Si les 3 checks passent, extrait. Sinon, n'extrait pas.
 - Lieu de residence ACTUELLE. Si plusieurs niveaux administratifs sont donnes pour la meme residence (quartier + gouvernorat, par exemple), extraire en un seul bloc continu tel qu'ecrit dans le texte.
 - Un lieu mentionne seulement comme etape passee ("apres avoir demenage depuis X") n'est ni origine ni adresse actuelle : ne pas l'extraire.
 
+### IMPORTANT — identifiants de dossier
+Le texte peut mentionner un identifiant ou numero de dossier patient (codes alphanumeriques avec tirets/underscores, ex. "EPR-AZ-004", "SEP_MJ_001"). ll ne s'agit d'AUCUN des types ci-dessus : ne l'extrais dans AUCUNE categorie, quel que soit le contexte (le numero de dossier est deja connu par ailleurs et n'a pas besoin d'etre extrait par toi).
+
 ---
 
-### ROLES (uniquement pour NOM_PRENOM — pour les 7 autres types, le role est TOUJOURS "PATIENT")
+### ROLES (uniquement pour NOM_PRENOM — pour les 6 autres types, le role est TOUJOURS "PATIENT")
 - PATIENT : la personne suivie/prise en charge.
 - PERE / MERE / FRERE / SOEUR : lien familial direct explicitement nomme.
 - ANTECEDENT : famille elargie (oncle, tante, grand-parent, cousin) ou lien familial imprecis.
@@ -243,7 +243,6 @@ _TYPE_MAP = {
     "DATE_NAISSANCE": EntityType.DATE_NAISSANCE,
     "CIN": EntityType.CIN,
     "NUM_CNAM": EntityType.NUM_CNAM,
-    "NUM_DOSSIER": EntityType.NUM_DOSSIER,
     "TELEPHONE": EntityType.TELEPHONE,
     "ORIGINE": EntityType.ORIGINE,
     "ADRESSE_PATIENT": EntityType.ADRESSE_PATIENT,
@@ -446,9 +445,7 @@ def _entities_to_champs(entities: list) -> dict:
     for ent in entities:
         role = ent.role.value if ent.role else "PATIENT"
 
-        if ent.label == EntityType.NUM_DOSSIER:
-            resultat["numero_dossier"] = resultat["numero_dossier"] or ent.text
-        elif ent.label == EntityType.DATE_NAISSANCE:
+        if ent.label == EntityType.DATE_NAISSANCE:
             resultat["date_naissance"] = resultat["date_naissance"] or ent.text
         elif ent.label == EntityType.ADRESSE_PATIENT:
             resultat["adresse"] = resultat["adresse"] or ent.text
@@ -475,9 +472,9 @@ def _entities_to_champs(entities: list) -> dict:
                 antecedents.append(ent.text)
             # role MEDECIN volontairement ignore : pas de champ dedie dans CHAMPS
 
-    resultat["frere"] = "; ".join(freres)
-    resultat["soeur"] = "; ".join(soeurs)
-    resultat["autre_antecedent"] = "; ".join(antecedents)
+    resultat["frere"] = ", ".join(freres)
+    resultat["soeur"] = ", ".join(soeurs)
+    resultat["autre_antecedent"] = ", ".join(antecedents)
 
     return resultat
 

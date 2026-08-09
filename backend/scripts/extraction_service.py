@@ -1,5 +1,3 @@
-
-
 import sys
 
 from fastapi import FastAPI, HTTPException
@@ -25,7 +23,6 @@ class ExtractionRequest(BaseModel):
 
 
 class ExtractionResponse(BaseModel):
-    numero_dossier: str = ""
     nom_prenom: str = ""
     date_naissance: str = ""
     adresse: str = ""
