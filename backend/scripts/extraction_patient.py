@@ -22,9 +22,6 @@ _model_load_error = None
 _load_lock = threading.Lock()
 
 
-# ============================================================
-# 1. Structures partagees (identique au notebook)
-# ============================================================
 
 class EntityType(str, Enum):
     NOM_PRENOM = "NOM_PRENOM"
@@ -117,9 +114,7 @@ def dedup_entities_by_identity(entities: list) -> list:
     return [item[0] for item in keep]
 
 
-# ============================================================
-# 2. Chargement du modele (llama_cpp / GGUF local, remplace transformers)
-# ============================================================
+
 
 def _charger_modele():
     global _extractor_model, _extractor_tokenizer, _model_load_error
@@ -133,7 +128,7 @@ def _charger_modele():
         try:
             model = Llama(
                 model_path=MODEL_PATH,
-                n_ctx=8192,
+                n_ctx=4096,
                 n_gpu_layers=-1,
                 verbose=False,
             )
@@ -144,38 +139,17 @@ def _charger_modele():
             raise
 
 
-# ============================================================
-# 3bis. Chat completion generique OpenAI-compatible
-#
-# Reutilise le MEME objet Llama() deja charge par _charger_modele()
-# (pas de second chargement du gguf, pas de second processus).
-# Expose depuis extraction_service.py sous /v1/chat/completions pour
-# que entities_extraction_service.py (pipeline SEP/EPR) tape sur ce
-# meme serveur/modele deja en memoire au lieu d'en charger un autre.
-# ============================================================
-
 def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
                                  json_schema=None, enable_thinking=False):
-    """Appelle le modele deja charge et renvoie une reponse au format
-    OpenAI (choices[0].message.content), pret a etre reembale par
-    extraction_service.py. json_schema (optionnel) contraint la sortie
-    via le mecanisme grammar de llama-cpp-python (equivalent local au
-    'guided_json' de vLLM)."""
+    
     _charger_modele()
     if _extractor_model is None:
         raise RuntimeError(f"Modele non charge : {_model_load_error}")
 
-    messages = [dict(m) for m in messages]  # copie, on ne modifie pas l'original de l'appelant
+    messages = [dict(m) for m in messages] 
 
     if not enable_thinking:
-        # CORRECTIF : llama-cpp-python ne supporte PAS le kwarg "extra_body"
-        # (c'est une convention du SDK OpenAI, absente de create_chat_completion()
-        # -> TypeError -> 500 sur quasiment tous les appels d'extraction
-        # structuree, puisque enable_thinking=False est le cas quasi-systematique
-        # envoye par entities_extraction_service.py).
-        # Qwen3 desactive nativement le raisonnement via le marqueur "/no_think"
-        # insere dans le dernier message utilisateur (mecanisme du chat template
-        # Qwen3, pas besoin d'un kwarg dedie cote llama-cpp-python).
+        
         for m in reversed(messages):
             if m.get("role") == "user":
                 m["content"] = "/no_think\n" + m["content"]
@@ -187,9 +161,7 @@ def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
         temperature=temperature,
     )
     if json_schema is not None:
-        # llama-cpp-python : contrainte JSON via response_format (grammar
-        # derivee automatiquement du schema) - equivalent local du
-        # guided_json de vLLM, sans second serveur ni second modele.
+        
         kwargs["response_format"] = {"type": "json_object", "schema": json_schema}
 
     try:
@@ -201,9 +173,6 @@ def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
         raise
 
 
-# ============================================================
-# 3. Prompt systeme (identique au notebook, NUM_DOSSIER retire)
-# ============================================================
 
 _EXTRACTOR_SYSTEM_PROMPT = """### ROLE
 Tu es un extracteur d'entites cliniques specialise pour le contexte medical tunisien (dossiers pediatriques, comptes-rendus, courriers).
@@ -306,9 +275,7 @@ _TYPE_MAP = {
 }
 
 
-# ============================================================
-# 4. Extraction LLM (adapte a llama_cpp au lieu de transformers.generate)
-# ============================================================
+
 
 def llm_extract_with_roles(text: str, max_new_tokens: int = 4000, verbose: bool = False) -> list:
     _charger_modele()
@@ -375,9 +342,7 @@ def llm_extract_with_roles(text: str, max_new_tokens: int = 4000, verbose: bool 
     return dedup_entities_by_identity(sorted(entities, key=lambda e: e.start))
 
 
-# ============================================================
-# 5. Chunking avec overlap (zones core) pour textes longs
-# ============================================================
+
 
 def _split_into_sentences(text: str) -> list:
     spans = []
@@ -488,9 +453,7 @@ def llm_extract_with_roles_chunked(
     return dedup_entities_by_identity(sorted(all_entities, key=lambda e: e.start))
 
 
-# ============================================================
-# 6. Adaptateur : liste d'entites -> dict plat CHAMPS (pour extraction_service.py)
-# ============================================================
+
 
 CHUNKING_THRESHOLD_WORDS = 100
 

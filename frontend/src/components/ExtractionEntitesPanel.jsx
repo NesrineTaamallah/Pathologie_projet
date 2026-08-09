@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import client from '../api/client';
 import { IconRefresh, IconAlert, IconCheckCircle } from './Icons';
 
@@ -54,7 +54,10 @@ export default function ExtractionEntitesPanel({
     }
   }
 
-  useState(() => { if (autoStart) lancerExtraction(); }); // eslint-disable-line
+  useEffect(() => {
+    if (autoStart) lancerExtraction();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateChampObjet(tableKey, champ, valeur) {
     setTables((t) => ({ ...t, [tableKey]: { ...t[tableKey], [champ]: valeur } }));
@@ -110,6 +113,11 @@ export default function ExtractionEntitesPanel({
             <IconRefresh size={13} />
             {extracting ? 'Extraction en cours…' : label}
           </button>
+        )}
+        {autoStart && extracting && (
+          <p className="hint" style={{ margin: 0, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconRefresh size={12} /> Extraction en cours…
+          </p>
         )}
         {error && (
           <p className="error" style={{ margin: '8px 0 0', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 5 }}>

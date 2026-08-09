@@ -1332,7 +1332,7 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
           <ExtractionEntitesModal
             pseudonyme={extractEntitesRow}
             onClose={() => setExtractEntitesRow(null)}
-            onReviewed={() => setExtractEntitesRow(null)}
+            onAllDone={() => setExtractEntitesRow(null)}
           />
         )}
         {ajoutError && (

@@ -127,7 +127,52 @@ async function listeNonExtraits(req, res) {
   }
 }
 
-module.exports = { extraireEntites, listeNonExtraits, extraireEntitesDocument, enregistrerEntites };
+/**
+ * GET /api/extraction/entites/:pseudonyme/documents-non-extraits
+ *
+ * Équivalent, pour les entités médicales, de
+ * GET /api/dossiers/:pseudonyme/documents-non-extraits (coordonnées) :
+ * liste les documents transcrits de CE patient dont les entités n'ont pas
+ * encore été extraites, pour alimenter le flux "texte par texte" (un
+ * document à la fois, cf. ExtractionEntitesModal.jsx / ExtractionEntitesPanel.jsx).
+ */
+async function documentsNonExtraitsEntites(req, res) {
+  const { pseudonyme } = req.params;
+
+  try {
+    const patientResult = await pool.query(
+      `SELECT pseudonyme, registre FROM patients WHERE pseudonyme = $1`,
+      [pseudonyme]
+    );
+    const patient = patientResult.rows[0];
+    if (!patient) {
+      return res.status(404).json({ error: 'Dossier introuvable.' });
+    }
+
+    const docsResult = await pool.query(
+      `SELECT id, type_document, type_entree, nom_fichier_original,
+              texte_transcrit, statut, created_at
+         FROM documents_bruts
+        WHERE pathologie = $1
+          AND pseudonyme = $2
+          AND texte_transcrit IS NOT NULL
+          AND TRIM(texte_transcrit) <> ''
+          AND COALESCE(entites_extraites, false) = false
+        ORDER BY created_at ASC`,
+      [patient.registre, pseudonyme]
+    );
+
+    res.json({ pseudonyme, registre: patient.registre, documents: docsResult.rows });
+  } catch (err) {
+    console.error('Erreur documentsNonExtraitsEntites :', err);
+    res.status(500).json({ error: 'Erreur serveur.' });
+  }
+}
+
+module.exports = {
+  extraireEntites, listeNonExtraits, extraireEntitesDocument, enregistrerEntites,
+  documentsNonExtraitsEntites,
+};
 
 /**
  * POST /api/extraction/entites-document
