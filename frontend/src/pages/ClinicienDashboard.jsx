@@ -25,14 +25,14 @@ function displayNameFromEmail(email) {
   if (!email) return 'Clinicien';
   const local = email.split('@')[0];
   const parts = local.split(/[._-]+/).filter(Boolean);
-  if (parts.length === 0) return local;
-  return parts
+  if (parts.length === 0) return `Dr. ${local}`;
+  return `Dr. ${parts
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-    .join(' ');
+    .join(' ')}`;
 }
 
 function initialsFromName(name) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const parts = name.trim().replace(/^Dr\.\s*/i, '').split(/\s+/).filter(Boolean);
   if (parts.length === 0) return 'CL';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
