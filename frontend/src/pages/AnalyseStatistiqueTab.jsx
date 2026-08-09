@@ -168,7 +168,16 @@ function ChampFormulaire({ schema, valeur, onChange }) {
     <input
       type={schema.type === 'number' ? 'number' : 'text'}
       value={valeur ?? schema.default ?? ''}
-      onChange={(e) => onChange(schema.type === 'number' ? Number(e.target.value) : e.target.value)}
+      onChange={(e) => {
+        const brut = e.target.value;
+        if (schema.type === 'number') {
+          // Un champ vidé doit rester "vide" (pas 0) pour permettre au backend
+          // de retomber sur son calcul automatique (ex. seuils par terciles).
+          onChange(brut === '' ? '' : Number(brut));
+        } else {
+          onChange(brut);
+        }
+      }}
     />
   );
 }
@@ -237,6 +246,10 @@ const EXPLICATIONS_PARAMETRES = {
   seuil_logistique: "Score EDSS à partir duquel un patient est considéré en mauvais pronostic (utilisé seulement en régression logistique).",
   mode_analyse: "« Univariée » : effet du délai seul. « Multivariée » : effet du délai ajusté sur d'autres facteurs cliniques (covariables).",
   covariables: "Facteurs cliniques additionnels inclus en mode multivarié. Plus il y en a, plus il faut de patients pour un résultat stable (règle d'environ 5 à 10 patients par variable).",
+  seuil_bas_clinicien: "Score en dessous duquel un patient est classé « risque faible » (population sévérité déclarée par le clinicien). Laisser vide pour un calcul automatique par terciles sur les patients de cette analyse.",
+  seuil_haut_clinicien: "Score à partir duquel un patient est classé « risque élevé » (population sévérité déclarée). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  seuil_bas_objectif: "Score en dessous duquel un patient est classé « risque faible » (population définition objective post-TAP). Laisser vide pour un calcul automatique par terciles.",
+  seuil_haut_objectif: "Score à partir duquel un patient est classé « risque élevé » (population définition objective post-TAP). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
 };
 
 function AideTest({ titre, description, parametresSchema, accent }) {
@@ -1020,17 +1033,21 @@ export default function AnalyseStatistiqueTab() {
         </div>
 
         {/* Colonne droite : résultats — scroll indépendant, ne bouge pas quand on scrolle le formulaire */}
-        {resultat && (
+        {(resultat || erreur) && (
           <div className="card" style={{
             padding: 22, flex: '2 1 480px', maxWidth: 760,
             maxHeight: 'calc(100vh - 150px)', overflowY: 'auto',
           }}>
-            <ResultatAnalyse
-              resultat={resultat}
-              accent={registre.accentDeep}
-              accentTint={registre.accentTint}
-              titreAnalyse={analyseSelectionnee.titre}
-            />
+            {resultat ? (
+              <ResultatAnalyse
+                resultat={resultat}
+                accent={registre.accentDeep}
+                accentTint={registre.accentTint}
+                titreAnalyse={analyseSelectionnee.titre}
+              />
+            ) : (
+              <ResultatErreur message={erreur} accent={registre.accentDeep} />
+            )}
           </div>
         )}
       </div>

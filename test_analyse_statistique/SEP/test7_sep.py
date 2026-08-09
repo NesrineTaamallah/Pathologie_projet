@@ -1,5 +1,3 @@
-
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -588,5 +586,3 @@ print("=" * 90)
 
 sys.stdout.fichier.close()
 sys.stdout = sys.stdout.terminal
-
-

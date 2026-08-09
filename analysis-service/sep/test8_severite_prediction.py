@@ -19,6 +19,22 @@ PARAMETRES_SCHEMA = {
         "type": "number", "default": 12,
         "label": "Fenêtre TAP précoce (mois après le diagnostic)",
     },
+    "seuil_bas_clinicien": {
+        "type": "number", "default": None, "required": False,
+        "label": "Score — seuil « risque faible / intermédiaire » (Y clinicien, laisser vide = auto)",
+    },
+    "seuil_haut_clinicien": {
+        "type": "number", "default": None, "required": False,
+        "label": "Score — seuil « risque intermédiaire / élevé » (Y clinicien, laisser vide = auto)",
+    },
+    "seuil_bas_objectif": {
+        "type": "number", "default": None, "required": False,
+        "label": "Score — seuil « risque faible / intermédiaire » (Y objectif, laisser vide = auto)",
+    },
+    "seuil_haut_objectif": {
+        "type": "number", "default": None, "required": False,
+        "label": "Score — seuil « risque intermédiaire / élevé » (Y objectif, laisser vide = auto)",
+    },
 }
 
 
@@ -41,6 +57,16 @@ def _charger_module_original(dossier_sortie: str):
     return module
 
 
+def _seuil(config: dict, cle: str):
+    """Convertit un champ de seuil du formulaire (nombre ou vide) vers float|None.
+    Un champ laissé vide (None, '', ou absent) rend au script son comportement
+    par défaut (seuils auto-calculés par terciles)."""
+    valeur = config.get(cle)
+    if valeur is None or valeur == "":
+        return None
+    return float(valeur)
+
+
 def run(engine, config: dict) -> dict:
     """Point d'entrée appelé par l'API. `config` = corps JSON envoyé par React."""
     dossier_sortie = tempfile.mkdtemp(prefix="sep8_")
@@ -55,6 +81,27 @@ def run(engine, config: dict) -> dict:
 
     try:
         tap_window_months = int(float(config.get("tap_window_months", m.TAP_WINDOW_MONTHS_DEFAULT)))
+
+        seuil_bas_clin = _seuil(config, "seuil_bas_clinicien")
+        seuil_haut_clin = _seuil(config, "seuil_haut_clinicien")
+        seuil_bas_obj = _seuil(config, "seuil_bas_objectif")
+        seuil_haut_obj = _seuil(config, "seuil_haut_objectif")
+
+        for nom_bas, nom_haut, bas, haut in [
+            ("seuil_bas_clinicien", "seuil_haut_clinicien", seuil_bas_clin, seuil_haut_clin),
+            ("seuil_bas_objectif", "seuil_haut_objectif", seuil_bas_obj, seuil_haut_obj),
+        ]:
+            if bas is not None and haut is not None and bas >= haut:
+                raise ValueError(
+                    f"Seuils invalides ({nom_bas}={bas} >= {nom_haut}={haut}) : le seuil bas doit "
+                    "être strictement inférieur au seuil haut. Laissez les deux champs vides pour "
+                    "revenir au calcul automatique (terciles)."
+                )
+            if (bas is None) != (haut is None):
+                raise ValueError(
+                    f"Renseignez {nom_bas} ET {nom_haut} ensemble, ou laissez les deux vides pour "
+                    "un calcul automatique — un seul seuil forcé n'est pas exploitable."
+                )
 
         origine_donnee_disponible = m.check_origine_donnee_disponible(engine)
         df_raw = m.extract_data(
@@ -89,12 +136,12 @@ def run(engine, config: dict) -> dict:
         res_clin = m.run_full_analysis(
             df_model, predictors, "y_clinicien",
             "Y_CLINICIEN (PRINCIPAL — sévérité déclarée)",
-            tap_window_months, None, None, "y_clinicien",
+            tap_window_months, seuil_bas_clin, seuil_haut_clin, "y_clinicien",
         )
         res_obj = m.run_full_analysis(
             df_model, predictors, "y_objectif",
             "Y_OBJECTIF (SECONDAIRE — définition objective post-TAP)",
-            tap_window_months, None, None, "y_objectif",
+            tap_window_months, seuil_bas_obj, seuil_haut_obj, "y_objectif",
         )
 
         rapport = m.generate_rapport_clinicien(
@@ -154,6 +201,10 @@ def run(engine, config: dict) -> dict:
             "auc_oof_objectif": round(float(res_obj["bootstrap"]["auc"]), 3),
             "fenetre_tap_mois": tap_window_months,
             "n_patients_simules": n_patients_simules,
+            "seuils_risque_clinicien": f"{res_clin['seuils'][0]} / {res_clin['seuils'][1]}"
+                                       f"{' (forcés)' if seuil_bas_clin is not None else ' (auto)'}",
+            "seuils_risque_objectif": f"{res_obj['seuils'][0]} / {res_obj['seuils'][1]}"
+                                      f"{' (forcés)' if seuil_bas_obj is not None else ' (auto)'}",
         }
 
         return {"notes": notes.lines, "figures": figures, "tableau": tableau, "resume_stats": resume_stats}

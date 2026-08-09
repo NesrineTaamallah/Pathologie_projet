@@ -92,7 +92,12 @@ def _preparer(df_brut: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     stats_exclusion["n_analysable_apres_filtrage"] = len(df)
     stats_exclusion["n_exclu_total"] = n_total - len(df)
 
-    df["consanguinite"] = df["consanguinite_parentale"].str.strip().str.capitalize()
+    # consanguinite_parentale est de type BOOLEAN en base (voir schema_registre.sql) :
+    # pandas/psycopg2 le renvoie comme bool Python, pas comme texte, donc l'ancien
+    # .str.strip().str.capitalize() levait "Can only use .str accessor with string
+    # values!". On mappe explicitement le booléen vers "Oui"/"Non" (valeurs attendues
+    # plus bas, ex. consanguinite_bin = (consanguinite == "Oui")).
+    df["consanguinite"] = df["consanguinite_parentale"].map({True: "Oui", False: "Non"})
     df["sexe"] = df["sexe"].str.strip().str.upper()
     df["forme_evolutive"] = df["forme_evolutive"].str.strip().str.upper()
     df["age_debut"] = df["age_premier_symptome_mois"] / 12.0

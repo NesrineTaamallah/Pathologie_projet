@@ -129,13 +129,18 @@ tap_precoce AS (
            -- Denominateur = duree REELLEMENT observee dans la fenetre TAP
            -- (mois ecoules entre diagnostic et date_dernier_suivi, plafonnee
            -- a tap_w), et non systematiquement la fenetre nominale complete.
+           -- su.date_dernier_suivi et ic.date_diagnostic sont de type DATE :
+           -- en PostgreSQL, (date - date) renvoie directement un entier (jours),
+           -- pas un INTERVAL, donc EXTRACT(EPOCH FROM ...) leve "la fonction
+           -- pg_catalog.extract(unknown, integer) n'existe pas". On convertit
+           -- l'ecart en jours (deja numerique) en mois via /30.44, sans EXTRACT.
            COUNT(pou.id)::NUMERIC / GREATEST(
                LEAST(
-                   COALESCE(EXTRACT(EPOCH FROM (su.date_dernier_suivi - ic.date_diagnostic)) / (30.44 * 86400), p.tap_w),
+                   COALESCE((su.date_dernier_suivi - ic.date_diagnostic)::NUMERIC / 30.44, p.tap_w),
                    p.tap_w
                ) / 12.0,
            0.1) AS tap_annualise,
-           EXTRACT(EPOCH FROM (su.date_dernier_suivi - ic.date_diagnostic)) / (30.44 * 86400) AS suivi_total_mois
+           (su.date_dernier_suivi - ic.date_diagnostic)::NUMERIC / 30.44 AS suivi_total_mois
     FROM sep_identification_clinique ic
     CROSS JOIN params p
     LEFT JOIN sep_poussees pou ON pou.pseudonyme = ic.pseudonyme
@@ -165,7 +170,7 @@ irm_initiale AS (
     JOIN sep_identification_clinique ic ON ic.pseudonyme = i.pseudonyme
     WHERE i.date_examen BETWEEN ic.date_diagnostic - INTERVAL '3 months'
                             AND ic.date_diagnostic + INTERVAL '6 months'
-    ORDER BY i.pseudonyme, ABS(EXTRACT(EPOCH FROM (i.date_examen - ic.date_diagnostic))) ASC
+    ORDER BY i.pseudonyme, ABS(i.date_examen - ic.date_diagnostic) ASC
 ),
 
 gd_post_tap AS (
@@ -339,11 +344,19 @@ def prepare_data(
 
     n_evt_clin = int(df_model["y_clinicien"].sum())
     n_evt_obj = int(df_model["y_objectif"].sum())
-    logger.info(f"[preparation] Y_clinicien (PRINCIPAL) : {n_evt_clin}/{len(df_model)} ({100*n_evt_clin/len(df_model):.1f}%) HA/A")
-    logger.info(f"[preparation] Y_objectif  (SECONDAIRE) : {n_evt_obj}/{len(df_model)} ({100*n_evt_obj/len(df_model):.1f}%) HA/A")
-    min_epv = min(n_evt_clin, n_evt_obj) / len(predictors)
-    if min_epv < 10:
-        logger.warning(f"[AVERTISSEMENT] EPV = {min_epv:.1f} (< 10) -> resultats EXPLORATOIRES.")
+    # len(df_model) peut valoir 0 si la fenetre TAP choisie exclut toute la
+    # cohorte : on protege ces logs contre la division par zero pour laisser
+    # le controle EFFECTIF_MINIMUM (fait par l'appelant juste apres) produire
+    # le message clinique clair, au lieu d'un ZeroDivisionError brut.
+    if len(df_model) > 0:
+        logger.info(f"[preparation] Y_clinicien (PRINCIPAL) : {n_evt_clin}/{len(df_model)} ({100*n_evt_clin/len(df_model):.1f}%) HA/A")
+        logger.info(f"[preparation] Y_objectif  (SECONDAIRE) : {n_evt_obj}/{len(df_model)} ({100*n_evt_obj/len(df_model):.1f}%) HA/A")
+        min_epv = min(n_evt_clin, n_evt_obj) / len(predictors)
+        if min_epv < 10:
+            logger.warning(f"[AVERTISSEMENT] EPV = {min_epv:.1f} (< 10) -> resultats EXPLORATOIRES.")
+    else:
+        logger.warning("[preparation] Aucun patient retenu apres filtrage des cas complets "
+                        "(predicteurs/severite manquants) pour cette fenetre TAP.")
     return df_model, predictors
 
 
