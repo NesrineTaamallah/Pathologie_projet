@@ -19,7 +19,7 @@ const REGISTRES = {
     accent: 'var(--teal)',
     accentTint: 'var(--teal-tint)',
     accentDeep: 'var(--teal-deep)',
-    resume: "Analyses portant sur le diagnostic et le suivi de la SEP pédiatrique : délai diagnostique et pronostic (score EDSS), fréquence des poussées, charge lésionnelle à l'IRM, marqueurs du LCR (bandes oligoclonales, index IgG) et facteurs cliniques associés à la forme évolutive.",
+    resume: "Huit tests statistiques pour explorer les facteurs pronostiques de la SEP pédiatrique : rapidité du diagnostic, récupération après la première poussée, fréquence des poussées, charge lésionnelle à l'IRM, marqueurs du LCR, contexte familial et réponse aux traitements.",
   },
   EPR: {
     label: 'EPR',
@@ -29,7 +29,7 @@ const REGISTRES = {
     accent: 'var(--violet)',
     accentTint: 'var(--violet-tint)',
     accentDeep: 'var(--violet-deep)',
-    resume: "Analyses portant sur l'étiologie et l'évolution de l'épilepsie pharmacorésistante pédiatrique : survie sans pharmacorésistance selon l'étiologie, régression étiologie/pharmacorésistance, et comparaison des types de crise (classification ILAE 2017).",
+    resume: "Sept tests statistiques pour explorer les facteurs pronostiques de l'épilepsie pharmacorésistante pédiatrique : étiologie et délai avant pharmacorésistance, type de crise (classification ILAE 2017), corrélation génotype-phénotype et contexte génétique familial.",
   },
 };
 
@@ -247,16 +247,16 @@ function ResultatErreur({ message, accent }) {
 
 
 const EXPLICATIONS_PARAMETRES = {
-  type_regression: "Modèle statistique utilisé : « linear » prédit une valeur d'EDSS continue ; « logistic » prédit la probabilité de dépasser un seuil de mauvais pronostic.",
-  horizon_annees: "Délai après le diagnostic auquel le pronostic est évalué (ex : EDSS à 1 an).",
-  tolerance_mois: "Marge acceptée autour de cet horizon pour associer une visite EDSS réelle. Plus large = plus de patients inclus, mais mesure moins précise dans le temps.",
-  seuil_logistique: "Score EDSS à partir duquel un patient est considéré en mauvais pronostic (utilisé seulement en régression logistique).",
-  mode_analyse: "« Univariée » : effet du délai seul. « Multivariée » : effet du délai ajusté sur d'autres facteurs cliniques (covariables).",
-  covariables: "Facteurs cliniques additionnels inclus en mode multivarié. Plus il y en a, plus il faut de patients pour un résultat stable (règle d'environ 5 à 10 patients par variable).",
-  seuil_bas_clinicien: "Score en dessous duquel un patient est classé « risque faible » (population sévérité déclarée par le clinicien). Laisser vide pour un calcul automatique par terciles sur les patients de cette analyse.",
-  seuil_haut_clinicien: "Score à partir duquel un patient est classé « risque élevé » (population sévérité déclarée). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
-  seuil_bas_objectif: "Score en dessous duquel un patient est classé « risque faible » (population définition objective post-TAP). Laisser vide pour un calcul automatique par terciles.",
-  seuil_haut_objectif: "Score à partir duquel un patient est classé « risque élevé » (population définition objective post-TAP). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  type_regression: "Choix du modèle : « linear » estime un score EDSS continu (ex : 3,5) ; « logistic » estime directement une probabilité de mauvais pronostic au-delà d'un seuil. Préférez « logistic » si vous cherchez surtout à identifier les patients à risque plutôt qu'une valeur précise.",
+  horizon_annees: "Moment, après le diagnostic, auquel le pronostic est évalué (ex : EDSS à 1 an). Un horizon court donne un résultat plus précis mais concerne moins de patients ayant un recul suffisant.",
+  tolerance_mois: "Marge acceptée autour de cet horizon pour rattacher une visite EDSS réelle. Une marge plus large inclut davantage de patients, au prix d'une mesure moins précise dans le temps — utile si l'échantillon est petit.",
+  seuil_logistique: "Score EDSS au-delà duquel un patient est considéré en mauvais pronostic (utilisé uniquement en régression logistique). À définir selon le seuil cliniquement pertinent pour votre pratique.",
+  mode_analyse: "« Univariée » : effet du facteur seul, à interpréter avec prudence (facteurs de confusion possibles). « Multivariée » : effet ajusté sur d'autres facteurs cliniques (covariables), résultat plus robuste mais exige davantage de patients.",
+  covariables: "Facteurs cliniques additionnels inclus en mode multivarié pour ajuster le résultat. Chaque covariable ajoutée dilue la puissance statistique : respectez la règle d'environ 5 à 10 patients par variable pour un résultat stable.",
+  seuil_bas_clinicien: "Score en dessous duquel un patient est classé « risque faible » (stratification selon l'appréciation clinique). Laisser vide pour un calcul automatique par terciles sur la cohorte de cette analyse.",
+  seuil_haut_clinicien: "Score à partir duquel un patient est classé « risque élevé » (stratification clinique). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  seuil_bas_objectif: "Score en dessous duquel un patient est classé « risque faible » (stratification selon une définition objective post-TAP, indépendante du jugement clinique). Laisser vide pour un calcul automatique par terciles.",
+  seuil_haut_objectif: "Score à partir duquel un patient est classé « risque élevé » (stratification objective post-TAP). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
 };
 
 function AideTest({ titre, description, parametresSchema, accent }) {
@@ -292,6 +292,9 @@ function AideTest({ titre, description, parametresSchema, accent }) {
             </div>
             {parametresSchema && Object.keys(parametresSchema).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: 'var(--slate-soft)' }}>
+                  Comment régler les paramètres
+                </div>
                 {Object.entries(parametresSchema).map(([nomChamp, schema]) => (
                   <div key={nomChamp}>
                     <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate-soft)' }}>{schema.label || nomChamp}</div>
@@ -914,7 +917,7 @@ export default function AnalyseStatistiqueTab() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', lineHeight: 1.35 }}>{a.titre}</div>
                     <div style={{ fontSize: 12.5, marginTop: 5, lineHeight: 1.5, color: 'var(--slate)' }}>
-                      <span style={{ fontWeight: 600, color: registre.accentDeep }}>But — </span>{a.description}
+                      <span style={{ fontWeight: 600, color: registre.accentDeep }}>Objectif clinique — </span>{a.description}
                     </div>
                   </div>
                 </div>

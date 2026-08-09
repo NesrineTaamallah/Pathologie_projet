@@ -1,0 +1,74 @@
+
+--- Rapport de gestion des valeurs manquantes ---
+Patients extraits initialement : 170
+  Exclus pour 'nb_ae_essayes manquant (NULL)' : 0
+  Exclus pour 'type_crise_ilae2017 manquant (NULL/'NA')' : 0
+Patients retenus pour l'analyse : 170 (100.0%)
+======================================================================
+EFFECTIFS PAR GROUPE DE TYPE DE CRISE
+======================================================================
+groupe_crise
+Focale (sans généralisation secondaire)    63
+Inconnue / non classée                     59
+Focale avec généralisation secondaire      36
+Spasmes                                    12
+
+======================================================================
+STATISTIQUES DESCRIPTIVES — nb_ae_essayes par groupe
+======================================================================
+                           groupe_crise  n  moyenne  ecart_type  mediane  min  max
+                 Inconnue / non classée 59     3.32        1.85      3.0    1    9
+                                Spasmes 12     3.17        2.44      2.5    1    9
+  Focale avec généralisation secondaire 36     2.67        1.24      2.0    1    5
+Focale (sans généralisation secondaire) 63     2.52        1.26      2.0    1    5
+
+--- Vérification des hypothèses ANOVA ---
+
+Normalité (Shapiro-Wilk) par groupe :
+  Focale (sans généralisation secondaire)       n= 63  W=0.865  p=0.0000  -> normalité rejetée (p<0.05)
+  Focale avec généralisation secondaire         n= 36  W=0.892  p=0.0021  -> normalité rejetée (p<0.05)
+  Inconnue / non classée                        n= 59  W=0.873  p=0.0000  -> normalité rejetée (p<0.05)
+  Spasmes                                       n= 12  W=0.835  p=0.0243  -> normalité rejetée (p<0.05)
+
+Homogénéité des variances (Levene) : W=4.148  p=0.0073
+
+======================================================================
+ANALYSE PRINCIPALE : ANOVA
+======================================================================
+
+--- ANOVA à un facteur : nb_ae_essayes ~ groupe_crise ---
+                   sum_sq     df       F  PR(>F)
+C(groupe_crise)   22.1436    3.0  2.9435  0.0346
+Residual         416.2623  166.0     NaN     NaN
+
+=> p = 0.0346 < 0.05 : différence significative selon le type de crise.
+
+--- Post-hoc Tukey HSD ---
+                                Multiple Comparison of Means - Tukey HSD, FWER=0.05                                
+===================================================================================================================
+                 group1                                 group2                meandiff p-adj   lower  upper  reject
+-------------------------------------------------------------------------------------------------------------------
+Focale (sans généralisation secondaire) Focale avec généralisation secondaire   0.1429 0.9729 -0.7158 1.0015  False
+Focale (sans généralisation secondaire)                Inconnue / non classée   0.7982 0.0304  0.0537 1.5428   True
+Focale (sans généralisation secondaire)                               Spasmes   0.6429 0.5713 -0.6516 1.9373  False
+  Focale avec généralisation secondaire                Inconnue / non classée   0.6554 0.2087 -0.2138 1.5245  False
+  Focale avec généralisation secondaire                               Spasmes      0.5 0.7794 -0.8699 1.8699  False
+                 Inconnue / non classée                               Spasmes  -0.1554 0.9897 -1.4568 1.1461  False
+-------------------------------------------------------------------------------------------------------------------
+
+======================================================================
+ANOVA CLASSIQUE PEU FIABLE ICI (hypothèses violées) -> WELCH-ANOVA
+======================================================================
+
+--- Welch-ANOVA (ne suppose pas l'homogénéité des variances) ---
+F(Welch) = 2.646   ddl1 = 3   ddl2 = 43.0   p = 0.0610
+
+======================================================================
+ANALYSES DE SENSIBILITÉ
+======================================================================
+
+--- Kruskal-Wallis (alternative non paramétrique) ---
+H = 5.964  p = 0.1134
+
+--- Régression de Poisson : nb_ae_essayes ~ groupe_crise (sensibilité) ---
+Ratio de dispersion (Pearson chi2 / ddl) = 0.84

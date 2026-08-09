@@ -117,7 +117,11 @@ from epr.test2_etiologie_regression import PARAMETRES_SCHEMA as EPR2_PARAMETRES_
 
 
 def run_epr3(engine, config):
-    return run_original_script(_epr("test3_epr.py"), env_overrides=PG_ENV)
+    from epr.test3_type_crise_anova import run as _run
+    return _run(engine, config)
+
+
+from epr.test3_type_crise_anova import PARAMETRES_SCHEMA as EPR3_PARAMETRES_SCHEMA
 
 
 def run_epr4(engine, config):
@@ -187,7 +191,7 @@ ANALYSES = {
               "parametres_schema": EPR2_PARAMETRES_SCHEMA, "run": run_epr2},
     "epr_3": {"registre": "EPR", "titre": "Type de crise ILAE 2017 et nombre d'AE essayés",
               "description": "ANOVA / comparaisons post-hoc (Tukey HSD).",
-              "parametres_schema": {}, "run": run_epr3},
+              "parametres_schema": EPR3_PARAMETRES_SCHEMA, "run": run_epr3},
     "epr_4": {"registre": "EPR", "titre": "Analyse EPR #4",
               "description": "Voir docstring du script original pour le détail clinique.",
               "parametres_schema": {}, "run": run_epr4},
