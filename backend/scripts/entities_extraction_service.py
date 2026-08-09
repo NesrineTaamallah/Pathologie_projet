@@ -2668,3 +2668,432 @@ def health():
     except requests.RequestException:
         qwen_ok = False
     return {"service": "ok", "qwen_8003": qwen_ok}
+
+# =============================================================================
+# =============================================================================
+# ## EXTENSION STREAMING — logique du notebook streaming_dedup_corrige.ipynb
+# =============================================================================
+# Tout ce qui suit reprend, sans rien omettre, la logique du notebook
+# streaming (template incrémental état-déjà-connu, fusion à verrous durs,
+# filtre mots-clés, passage de rattrapage, vérification ciblée finale),
+# adaptée pour réutiliser telles quelles les fonctions déjà définies
+# ci-dessus (llm_extract, build_json_schema, cast_raw_table, attach_evidence,
+# validate_result, verifier_table, TABLES_SEP/EPR/TABLES_BY_NAME,
+# VERIFICATION_TABLES_SEP/EPR, enforce_unique_etiologie_principale,
+# _tronquer_si_besoin, MAX_NEW_TOKENS, MAX_CONTEXTE_TABLE_CHARS,
+# GREEDY_SAMPLER, REPEATED_SAMPLER — pas de doublon, pas de rechargement de
+# modèle : le LLM appelé est le même serveur Qwen local sur le port 8003).
+#
+# AJOUT (mémoire base de données) : la route /extract-entites-streaming
+# accepte un champ optionnel `etat_initial` = les valeurs déjà enregistrées
+# en base pour ce patient (à envoyer depuis entitesExtractionClient.js côté
+# Node, qui a déjà accès à Postgres). Ces valeurs deviennent le POINT DE
+# DÉPART de l'état streaming : le LLM les voit comme "déjà connu" dès le
+# premier chunk, exactement comme s'il s'agissait de chunks déjà traités
+# lors d'une visite précédente — ça évite les doublons/contradictions avec
+# les données déjà existantes du dossier patient.
+# =============================================================================
+
+# --- Paramètres streaming (section 1 du notebook) ---
+TAILLE_FENETRE_GLISSANTE = 2  # chunk courant + 1 précédent
+ACTIVER_VOTE_STREAMING = False
+N_VOTES_STREAMING = 2
+
+
+# NOTE : join_chunks() existe déjà plus haut dans ce fichier (section 6 du
+# service "dossier complet") mais opère sur des chunks {"texte": ...} alors
+# que le pipeline streaming utilise {"text": ...} (clé reprise telle quelle
+# du notebook) -> variante dédiée avec un nom distinct pour ne rien casser.
+def join_chunks_streaming(chunks: list) -> str:
+    return "\n".join(c["text"] for c in chunks)
+
+
+# ---------------------------------------------------------------------------
+# ## Template incrémental (section 7 du notebook) — inchangé
+# ---------------------------------------------------------------------------
+INCR_TEMPLATE_STR = """
+Tu es un assistant d'extraction d'information clinique pour un registre médical pédiatrique,
+en cours de DICTÉE EN DIRECT (transcription automatique par segments de ~30 secondes).
+
+Tu dois mettre à jour la table "{{ table }}" : {{ description }}
+
+--- INFORMATIONS DÉJÀ CONNUES POUR CETTE TABLE (extraites des segments précédents de CE patient) ---
+{{ etat_existant_json }}
+--- FIN DES INFORMATIONS DÉJÀ CONNUES ---
+
+RÈGLES STRICTES (à respecter absolument) :
+1. Le nouveau segment ci-dessous peut REFORMULER une information déjà listée ci-dessus (le médecin
+   répète ou reformule un point déjà dicté). Dans ce cas, NE CRÉE PAS de nouvelle entrée en double —
+   ignore cette répétition.
+2. Si le nouveau segment apporte un DÉTAIL SUPPLÉMENTAIRE sur une entrée déjà connue (ex. précise la
+   dose d'un médicament déjà listé, ou la date d'un examen déjà mentionné sans date), renvoie cette
+   entrée MISE À JOUR avec le champ complété — pas une entrée en plus.
+3. Ne renvoie QUE les entrées NOUVELLES ou MISES À JOUR par CE segment précis — jamais la liste
+   complète déjà connue si ce segment ne la concerne pas.
+4. N'invente rien. "null" (chaîne littérale) = non mentionné dans ce segment. "NA" = explicitement
+   non applicable. Ne mets "Inconnue" que si le texte l'indique explicitement.
+{% if repetee %}
+5. Retourne une LISTE (peut être vide []) des entrées nouvelles ou mises à jour par ce segment.
+{% else %}
+5. Retourne l'information si CE segment la mentionne, sinon "null" pour chaque champ.
+{% endif %}
+{% if priorite_recente %}
+6. Ce segment est CHRONOLOGIQUEMENT PLUS RÉCENT que toute information déjà connue ci-dessus — si ce
+   segment contredit une information déjà connue (ex. un statut de suivi différent), donne la valeur
+   telle que CE segment la décrit maintenant, sans te soucier de la contradiction : c'est attendu,
+   c'est une mise à jour, pas une erreur.
+{% endif %}
+
+CHAMPS DE LA TABLE :
+{% for champ in champs %}
+- {{ champ.nom }} (type: {{ champ.type }}{% if champ.valeurs %}, valeurs possibles: {{ champ.valeurs }}{% endif %}{% if champ.na_possible %}, "NA" possible{% endif %})
+{% endfor %}
+
+--- NOUVEAU SEGMENT À ANALYSER (+ 1 segment précédent pour le contexte) ---
+{{ texte_fenetre }}
+--- FIN DU SEGMENT ---
+
+Réponds STRICTEMENT en JSON valide, sans aucun texte avant ou après, conforme au schéma fourni.
+JSON :
+"""
+
+_incr_env = Environment(trim_blocks=True, lstrip_blocks=True)
+_INCR_TEMPLATE = _incr_env.from_string(INCR_TEMPLATE_STR)
+
+
+def _valeur_vers_litteral(v, champ_type):
+    if v is None:
+        return "null"
+    if v == "NA":
+        return "NA"
+    if champ_type == "booleen":
+        return "true" if v else "false"
+    return str(v)
+
+
+def _etat_vers_litteral(table_cfg, etat_table):
+    champ_types = {c["nom"]: c["type"] for c in table_cfg["champs"]}
+
+    def _obj(o):
+        return {k: _valeur_vers_litteral(v, champ_types.get(k, "texte"))
+                 for k, v in o.items() if not k.startswith("evidence_span_")}
+
+    if table_cfg["repetee"]:
+        return [_obj(o) for o in (etat_table or [])]
+    return _obj(etat_table) if etat_table else {c["nom"]: "null" for c in table_cfg["champs"]}
+
+
+def build_prompt_incremental(table_cfg, etat_table, texte_fenetre):
+    etat_json = json.dumps({table_cfg["table"]: _etat_vers_litteral(table_cfg, etat_table)},
+                            ensure_ascii=False, indent=2)
+    return _INCR_TEMPLATE.render(
+        table=table_cfg["table"], description=table_cfg["description"],
+        repetee=table_cfg["repetee"], champs=table_cfg["champs"],
+        priorite_recente=table_cfg.get("priorite_recente", False),
+        etat_existant_json=etat_json, texte_fenetre=texte_fenetre,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ## Fusion à verrous durs (section 8 du notebook) — inchangé
+# ---------------------------------------------------------------------------
+import re
+import unicodedata
+
+ALIAS_AE = {
+    "depakine": "valproate de sodium (Dépakine)", "valproate": "valproate de sodium (Dépakine)",
+    "tegretol": "carbamazépine (Tégrétol)", "carbamazepine": "carbamazépine (Tégrétol)",
+    "taver": "carbamazépine (Tégrétol)",
+    "trileptal": "oxcarbazépine (Trileptal)", "oxcarbamazepine": "oxcarbazépine (Trileptal)",
+    "oxcarbazepine": "oxcarbazépine (Trileptal)",
+    "lamictal": "lamotrigine (Lamictal)", "lamotrigine": "lamotrigine (Lamictal)",
+    "keppra": "lévétiracétam (Levet/Keppra)", "levet": "lévétiracétam (Levet/Keppra)",
+    "levetiracetam": "lévétiracétam (Levet/Keppra)",
+    "urbanyl": "clobazam (Urbanyl)", "clobazam": "clobazam (Urbanyl)", "frisium": "clobazam (Urbanyl)",
+    "rivotril": "clonazépam (Rivotril)", "clonazepam": "clonazépam (Rivotril)",
+    "ribotril": "clonazépam (Rivotril)",
+    "epitomax": "topiramate (Epitomax)", "topiramate": "topiramate (Epitomax)",
+    "gardenal": "phénobarbital (Gardénal)", "phenobarbital": "phénobarbital (Gardénal)",
+    "sabril": "vigabatrin (Sabril)", "vigabatrin": "vigabatrin (Sabril)",
+    "dilantin": "phénytoïne (Dilantin)", "phenytoine": "phénytoïne (Dilantin)",
+    "vimpat": "lacosamide (Vimpat)", "lacosamide": "lacosamide (Vimpat)",
+    "valium": "diazépam (Valium)", "diazepam": "diazépam (Valium)",
+}
+
+
+def _normaliser_nom_ae(nom):
+    s = unicodedata.normalize("NFKD", nom.lower()).encode("ascii", "ignore").decode()
+    s = re.sub(r"[^a-z]", "", s)
+    for cle, canon in ALIAS_AE.items():
+        if cle in s or s in cle:
+            return canon
+    return nom.strip()
+
+
+def _champs_date(table_cfg):
+    return [c["nom"] for c in table_cfg["champs"] if c["type"] == "date"]
+
+
+def _champs_categoriels(table_cfg):
+    return [c["nom"] for c in table_cfg["champs"] if c["type"] == "categoriel"]
+
+
+def _meme_occurrence(table_cfg, existante, nouvelle):
+    """Verrous durs : jamais la même occurrence si un champ date ou
+    catégoriel non-null diffère entre les deux (leçon vise-70-v6)."""
+    for champ in _champs_date(table_cfg) + _champs_categoriels(table_cfg):
+        va, vb = existante.get(champ), nouvelle.get(champ)
+        if va not in (None, "NA", "null") and vb not in (None, "NA", "null") and str(va) != str(vb):
+            return False
+    return True
+
+
+def fusionner_occurrences_repetee(table_cfg, etat_liste, nouvelles_occs):
+    etat_liste = list(etat_liste or [])
+    table_name = table_cfg["table"]
+
+    for nouvelle in nouvelles_occs:
+        if table_name == "epr_liste_ae" and "nom_ae" in nouvelle:
+            nouvelle["nom_ae"] = _normaliser_nom_ae(str(nouvelle.get("nom_ae") or ""))
+            match_idx = next((i for i, e in enumerate(etat_liste)
+                               if _normaliser_nom_ae(str(e.get("nom_ae") or ""))
+                               == nouvelle["nom_ae"]), None)
+        else:
+            match_idx = next((i for i, e in enumerate(etat_liste)
+                               if _meme_occurrence(table_cfg, e, nouvelle)), None)
+
+        if match_idx is None:
+            etat_liste.append(nouvelle)
+        else:
+            for k, v in nouvelle.items():
+                if v not in (None, "null"):
+                    etat_liste[match_idx][k] = v
+    return etat_liste
+
+
+def fusionner_champs_simples(table_cfg, etat_dict, nouveau_dict):
+    etat_dict = dict(etat_dict or {c["nom"]: None for c in table_cfg["champs"]})
+    priorite_recente = table_cfg.get("priorite_recente", False)
+    for k, v in (nouveau_dict or {}).items():
+        if v in (None, "null"):
+            continue
+        if priorite_recente or etat_dict.get(k) in (None, "null", "NA"):
+            etat_dict[k] = v
+    return etat_dict
+
+
+# ---------------------------------------------------------------------------
+# ## Extraction incrémentale — 1 appel LLM par (table, chunk pertinent)
+#    (section 9 du notebook) — réutilise llm_extract() de ton service
+# ---------------------------------------------------------------------------
+def table_concernee_par_chunk(chunk_texte, table_cfg):
+    """Test 0-coût (pas de LLM) : ce chunk contient-il un mot-clé de la
+    table ? Décide si on déclenche un appel LLM pour cette table."""
+    mots_cles = [m.lower() for m in (table_cfg.get("mots_cles") or [])]
+    if not mots_cles:
+        return True
+    return any(m in chunk_texte.lower() for m in mots_cles)
+
+
+def extraire_incremental(table_cfg, etat_table, texte_fenetre):
+    table_name = table_cfg["table"]
+    prompt = build_prompt_incremental(table_cfg, etat_table, texte_fenetre)
+    schema = build_json_schema(table_cfg)
+    max_tokens = min(table_cfg.get("max_tokens", MAX_NEW_TOKENS), MAX_NEW_TOKENS)
+
+    if ACTIVER_VOTE_STREAMING and table_cfg["repetee"]:
+        runs = []
+        for _ in range(N_VOTES_STREAMING):
+            try:
+                raw = llm_extract(prompt, schema, max_tokens=max_tokens, repetee=True, sampler=REPEATED_SAMPLER)
+                runs.append(raw.get(table_name) or [])
+            except Exception:
+                runs.append([])
+        payload = [occ for run in runs for occ in run]
+    else:
+        # Sampler différencié : multinomial pour les tables répétées (listes),
+        # greedy pour les objets uniques — évite le collapse silencieux vers []
+        # (bug corrigé dans le notebook, section 9).
+        sampler_a_utiliser = REPEATED_SAMPLER if table_cfg["repetee"] else GREEDY_SAMPLER
+        try:
+            raw = llm_extract(prompt, schema, max_tokens=max_tokens,
+                               repetee=table_cfg["repetee"], sampler=sampler_a_utiliser)
+            payload = raw.get(table_name)
+            if table_cfg["repetee"]:
+                payload = payload or []
+        except Exception:
+            payload = [] if table_cfg["repetee"] else {c["nom"]: None for c in table_cfg["champs"]}
+
+    return cast_raw_table(payload, table_cfg)
+
+
+# ---------------------------------------------------------------------------
+# ## Orchestration streaming (section 11 du notebook) — inchangé
+# ---------------------------------------------------------------------------
+def extraire_dossier_streaming(chunks, tables_config, registre_label, etat_initial=None):
+    """etat_initial (optionnel) : donnees deja enregistrees en base pour ce
+    patient (une visite precedente, une saisie manuelle...), au format
+    {nom_table: {...} ou [...]}. Si fourni, sert de POINT DE DEPART de
+    l'etat streaming -> le LLM les voit comme "deja connu" des le 1er chunk
+    (meme mecanisme que l'etat accumule chunk par chunk, section 7/8 du
+    notebook), et la fusion a verrous durs s'applique normalement dessus."""
+    etat = {t["table"]: ([] if t["repetee"] else {c["nom"]: None for c in t["champs"]})
+            for t in tables_config}
+    if etat_initial:
+        for t in tables_config:
+            table_name = t["table"]
+            val_bdd = etat_initial.get(table_name)
+            if not val_bdd:
+                continue
+            if t["repetee"]:
+                etat[table_name] = fusionner_occurrences_repetee(t, etat[table_name], list(val_bdd))
+            else:
+                etat[table_name] = fusionner_champs_simples(t, etat[table_name], val_bdd)
+    journal = []
+    n_appels_llm_total = 0
+    texte_dossier_complet = join_chunks_streaming(chunks)
+
+    for pos, chunk in enumerate(chunks):
+        chunk_precedent = chunks[pos - 1] if pos > 0 else None
+        texte_fenetre = (chunk_precedent["text"] + "\n" + chunk["text"]) if chunk_precedent else chunk["text"]
+        texte_fenetre = _tronquer_si_besoin(texte_fenetre, MAX_CONTEXTE_TABLE_CHARS)
+
+        for table_cfg in tables_config:
+            table_name = table_cfg["table"]
+            if not table_concernee_par_chunk(chunk["text"], table_cfg):
+                continue
+
+            avant = etat[table_name]
+            nouvelles = extraire_incremental(table_cfg, avant, texte_fenetre)
+            n_appels_llm_total += N_VOTES_STREAMING if (ACTIVER_VOTE_STREAMING and table_cfg["repetee"]) else 1
+
+            if table_cfg["repetee"]:
+                apres = fusionner_occurrences_repetee(table_cfg, avant, nouvelles)
+                n_ajouts = len(apres) - len(avant)
+            else:
+                apres = fusionner_champs_simples(table_cfg, avant, nouvelles)
+                n_ajouts = sum(1 for k in apres if apres.get(k) != (avant or {}).get(k))
+            etat[table_name] = apres
+
+            if n_ajouts != 0 or (table_cfg["repetee"] and nouvelles):
+                journal.append({"chunk_idx": chunk["idx"], "table": table_name,
+                                 "n_occurrences_renvoyees_par_llm": len(nouvelles) if table_cfg["repetee"] else None,
+                                 "delta_etat": n_ajouts})
+
+    # Passage de rattrapage : toute table jamais déclenchée par aucun chunk
+    tables_jamais_declenchees = [t for t in tables_config
+                                  if not any(j["table"] == t["table"] for j in journal)]
+    for table_cfg in tables_jamais_declenchees:
+        table_name = table_cfg["table"]
+        avant = etat[table_name]
+        nouvelles = extraire_incremental(table_cfg, avant, texte_dossier_complet)
+        n_appels_llm_total += 1
+
+        if table_cfg["repetee"]:
+            apres = fusionner_occurrences_repetee(table_cfg, avant, nouvelles)
+            n_ajouts = len(apres) - len(avant)
+        else:
+            apres = fusionner_champs_simples(table_cfg, avant, nouvelles)
+            n_ajouts = sum(1 for k in apres if apres.get(k) != (avant or {}).get(k))
+        etat[table_name] = apres
+
+        if n_ajouts != 0 or (table_cfg["repetee"] and nouvelles):
+            journal.append({"chunk_idx": None, "table": table_name,
+                             "n_occurrences_renvoyees_par_llm": len(nouvelles) if table_cfg["repetee"] else None,
+                             "delta_etat": n_ajouts})
+
+    # Post-traitement final : evidence_span + validation déterministe (réutilise ton service)
+    resultats, erreurs = {}, []
+    for table_cfg in tables_config:
+        table_name = table_cfg["table"]
+        payload = attach_evidence(etat[table_name], table_cfg, texte_dossier_complet)
+        valide, issues = validate_result({table_name: payload}, table_cfg, texte_dossier_complet)
+        resultats[table_name] = valide[table_name]
+        if issues:
+            erreurs.append({"table": table_name, "issues": issues})
+
+    # Vérification ciblée finale (réutilise verifier_table déjà en place)
+    verification_tables = VERIFICATION_TABLES_EPR if registre_label == "EPR" else VERIFICATION_TABLES_SEP
+    for table_name in verification_tables:
+        table_cfg = TABLES_BY_NAME[table_name]
+        corrige, meta_verif = verifier_table(table_cfg, resultats[table_name], texte_dossier_complet)
+        if meta_verif.get("divergence_detectee"):
+            corrige = attach_evidence(corrige, table_cfg, texte_dossier_complet)
+            _, issues2 = validate_result({table_name: corrige}, table_cfg, texte_dossier_complet)
+            resultats[table_name] = corrige
+    n_appels_llm_total += len(verification_tables)
+
+    if registre_label == "EPR" and "epr_etiologie" in resultats:
+        resultats["epr_etiologie"], etio_issue = enforce_unique_etiologie_principale(resultats["epr_etiologie"])
+        if etio_issue:
+            erreurs.append({"table": "epr_etiologie", "issues": [etio_issue]})
+
+    return {"registre": registre_label, "patient_id": None, "tables": resultats,
+            "a_verifier": erreurs, "journal_streaming": journal, "n_appels_llm_total": n_appels_llm_total}
+
+
+# ---------------------------------------------------------------------------
+# ## Nouvelle route API — même contrat d'entrée que /extract-entites
+# ---------------------------------------------------------------------------
+class ChunkInStreaming(BaseModel):
+    texte: str
+    date: str | None = None
+
+
+class ExtractionRequestStreaming(BaseModel):
+    registre: str
+    chunks: list[ChunkInStreaming]
+    patient_id: str | None = None
+    # Donnees deja en base pour ce patient, a fournir par le backend Node
+    # (il a deja acces a Postgres) : {nom_table: {...} ou [...]}. Sert de
+    # "memoire" injectee au LLM des le depart -> pas de duplication/contradiction
+    # avec ce qui a deja ete saisi lors d'une visite precedente.
+    etat_initial: dict | None = None
+
+
+@app.post("/extract-entites-streaming")
+def extract_entites_streaming(req: ExtractionRequestStreaming):
+    if req.registre not in ("SEP", "EPR"):
+        raise HTTPException(400, "registre doit être 'SEP' ou 'EPR'.")
+    if not req.chunks:
+        raise HTTPException(422, "Aucun chunk de texte fourni.")
+
+    # Adapte les clés {texte,date} du contrat existant vers {idx,text}
+    # attendues par extraire_dossier_streaming (repris du notebook).
+    chunks_dossier = [{"idx": i, "text": c.texte} for i, c in enumerate(req.chunks)]
+    tables_config = TABLES_SEP if req.registre == "SEP" else TABLES_EPR
+
+    try:
+        resultat = extraire_dossier_streaming(
+            chunks_dossier, tables_config, req.registre, etat_initial=req.etat_initial,
+        )
+    except NameError as exc:
+        raise HTTPException(500, f"Service mal configuré : import manquant ({exc}).")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"Échec de l'extraction streaming : {exc}")
+
+    resultat["patient_id"] = req.patient_id
+    return resultat
+
+
+# NOTE — comment fournir `etat_initial` (mémoire base de données) :
+# Côté Node (entitesExtractionClient.js), avant d'appeler cette route :
+#   1. SELECT * des tables sep_*/epr_* deja enregistrees pour ce patient_id
+#      (les memes tables que schema_registre.sql, memes noms de colonnes que
+#      les champs des schemas YAML ci-dessus)
+#   2. Construire { "sep_identification_clinique": {...}, "sep_edss_visites": [...], ... }
+#      (objet pour les tables non repetees, liste d'objets pour les tables repetees)
+#   3. L'envoyer dans le corps de la requete comme `etat_initial`
+# Le LLM verra alors ces valeurs comme "deja connu" des le premier chunk
+# (meme prompt/regles que pour l'etat accumule au fil des chunks), et ne les
+# dupliquera pas / completera les champs manquants au lieu de recreer une
+# entree, exactement comme demande.
+#
+# NOTE — "vrai" live token-par-chunk (optionnel, pour plus tard) :
+# Cette route recalcule tout l'etat streaming a chaque appel HTTP (a partir
+# de etat_initial + tous les chunks envoyes). Pour un vrai live ou un seul
+# NOUVEAU chunk arrive a la fois sans renvoyer tout l'historique, il faudrait
+# persister l'etat intermediaire entre deux appels (memoire process ou table
+# Postgres dediee) et exposer une route /extract-entites-streaming/chunk qui
+# ne traite qu'un seul nouveau chunk a la fois. Dis-moi si tu veux cette
+# version plus tard.

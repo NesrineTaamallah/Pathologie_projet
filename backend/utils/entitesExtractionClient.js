@@ -13,4 +13,17 @@ async function extraireEntitesMedicales(registre, chunks) {
   return data;
 }
 
-module.exports = { extraireEntitesMedicales };
+// --- Streaming (chunk par chunk, avec memoire des donnees deja en base) ---
+// etatInitial (optionnel) : { nom_table: {...} ou [...] }, construit a partir
+// des lignes deja enregistrees pour ce patient (voir chargerEtatInitialDepuisDB
+// plus bas). patientId (optionnel) : juste renvoye tel quel dans la reponse.
+async function extraireEntitesMedicalesStreaming(registre, chunks, { patientId, etatInitial } = {}) {
+  const { data } = await axios.post(
+    `${ENTITES_SERVICE_URL}/extract-entites-streaming`,
+    { registre, chunks, patient_id: patientId, etat_initial: etatInitial },
+    { timeout: 10 * 60 * 1000 }
+  );
+  return data;
+}
+
+module.exports = { extraireEntitesMedicales, extraireEntitesMedicalesStreaming };
