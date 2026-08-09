@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 try:
     import extraction_patient as ep
-except Exception as exc:  # ModuleNotFoundError, ImportError CUDA/torch, etc.
+except Exception as exc:  
     
     print(f"[extraction_service] ERREUR au chargement de extraction_patient : {exc}", file=sys.stderr)
     ep = None

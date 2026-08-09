@@ -145,6 +145,45 @@ def _charger_modele():
 
 
 # ============================================================
+# 3bis. Chat completion generique OpenAI-compatible
+#
+# Reutilise le MEME objet Llama() deja charge par _charger_modele()
+# (pas de second chargement du gguf, pas de second processus).
+# Expose depuis extraction_service.py sous /v1/chat/completions pour
+# que entities_extraction_service.py (pipeline SEP/EPR) tape sur ce
+# meme serveur/modele deja en memoire au lieu d'en charger un autre.
+# ============================================================
+
+def chat_completion_openai_like(messages, max_tokens=768, temperature=0.0,
+                                 json_schema=None, enable_thinking=False):
+    """Appelle le modele deja charge et renvoie une reponse au format
+    OpenAI (choices[0].message.content), pret a etre reembale par
+    extraction_service.py. json_schema (optionnel) contraint la sortie
+    via le mecanisme grammar de llama-cpp-python (equivalent local au
+    'guided_json' de vLLM)."""
+    _charger_modele()
+    if _extractor_model is None:
+        raise RuntimeError(f"Modele non charge : {_model_load_error}")
+
+    kwargs = dict(
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    if json_schema is not None:
+        # llama-cpp-python : contrainte JSON via response_format (grammar
+        # derivee automatiquement du schema) - equivalent local du
+        # guided_json de vLLM, sans second serveur ni second modele.
+        kwargs["response_format"] = {"type": "json_object", "schema": json_schema}
+    if not enable_thinking:
+        # Qwen3 : desactive le bloc <think> pour les appels d'extraction
+        # structuree (plus rapide, sortie directement exploitable).
+        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+
+    return _extractor_model.create_chat_completion(**kwargs)
+
+
+# ============================================================
 # 3. Prompt systeme (identique au notebook, NUM_DOSSIER retire)
 # ============================================================
 
