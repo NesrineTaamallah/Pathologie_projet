@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 import client from '../api/client';
 import useDragScroll from '../hooks/useDragScroll';
 import { SectionHeading } from '../components/DashboardWidgets';
@@ -314,7 +315,7 @@ function FichierField({ table, rowId, pseudonyme, cheminFichier, nomFichierOrigi
         <input
           id={inputId}
           type="file"
-          accept="application/pdf,image/png,image/jpeg,image/tiff,image/webp"
+          accept="application/pdf,image/png,image/jpeg,image/tiff,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska"
           onChange={handleFileChange}
           disabled={uploading}
           style={{ display: 'none' }}
@@ -323,6 +324,68 @@ function FichierField({ table, rowId, pseudonyme, cheminFichier, nomFichierOrigi
       {uploading && <p style={{ margin: 0, fontSize: 11, color: 'var(--slate)' }}>Envoi en cours…</p>}
       {error && <p style={{ margin: 0, fontSize: 11, color: 'var(--error, #c23b4e)' }}>{error}</p>}
     </div>
+  );
+}
+
+function RowActionsMenu({ open, onToggle, onClose, anchorRef, children, badge }) {
+  const menuRef = useRef(null);
+  const [pos, setPos] = useState(null);
+
+  useEffect(() => {
+    if (!open || !anchorRef.current) { setPos(null); return; }
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 6, left: rect.right - 210 });
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e) {
+      if (
+        anchorRef.current && !anchorRef.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) onClose();
+    }
+    function handleEscape(e) { if (e.key === 'Escape') onClose(); }
+    function handleReposition() { onClose(); } 
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', handleReposition, true);
+    window.addEventListener('resize', handleReposition);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener('resize', handleReposition);
+    };
+  }, [open, anchorRef, onClose]);
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={anchorRef}
+        className="kebab-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Plus d'actions"
+        onClick={onToggle}
+        style={{ position: 'relative' }}
+      >
+        <IconDots size={17} />
+        {badge}
+      </button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          className="actions-menu"
+          role="menu"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, right: 'auto' }}
+        >
+          {children}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -1010,18 +1073,18 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
   const [extractEntitesRow, setExtractEntitesRow] = useState(null);
   const [openMenuRow, setOpenMenuRow] = useState(null);
   const tableRef = useRef(null);
+  const kebabRefs = useRef({});
+  function getKebabRef(key) {
+    if (!kebabRefs.current[key]) kebabRefs.current[key] = { current: null };
+    return kebabRefs.current[key];
+  }
 
   useEffect(() => {
-    function handleOutside(e) {
-      if (tableRef.current && !tableRef.current.contains(e.target)) setOpenMenuRow(null);
-    }
     function handleEscape(e) {
       if (e.key === 'Escape') setOpenMenuRow(null);
     }
-    document.addEventListener('mousedown', handleOutside);
     document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, []);
@@ -1195,30 +1258,23 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
                           </button>
 
                           <div className="actions-cell" style={{ position: 'relative' }}>
-                            <button
-                              type="button"
-                              className="kebab-btn"
-                              aria-haspopup="menu"
-                              aria-expanded={openMenuRow === r.pseudonyme}
-                              aria-label="Plus d'actions"
-                              onClick={() => setOpenMenuRow((cur) => (cur === r.pseudonyme ? null : r.pseudonyme))}
-                              style={{ position: 'relative' }}
-                            >
-                              <IconDots size={17} />
-                              {r.entites_en_attente > 0 && (
+                            <RowActionsMenu
+                              open={openMenuRow === r.pseudonyme}
+                              onToggle={() => setOpenMenuRow((cur) => (cur === r.pseudonyme ? null : r.pseudonyme))}
+                              onClose={() => setOpenMenuRow(null)}
+                              anchorRef={getKebabRef(r.pseudonyme)}
+                              badge={r.entites_en_attente > 0 && (
                                 <span style={{
                                   position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: 999,
                                   background: 'var(--error, #b3261e)', border: '1.5px solid var(--card)',
                                 }} />
                               )}
-                            </button>
-                            {openMenuRow === r.pseudonyme && (
-                              <div className="actions-menu" role="menu" style={{ right: 0, left: 'auto' }}>
+                            >
                                 <div className="actions-menu-group">
                                   <button
-                                    type="button" className="actions-menu-item" role="menuitem"
+                                    type="button" className="actions-menu-item action-add" role="menuitem"
                                     disabled={ajoutLoading === r.pseudonyme}
-                                    title="Ajouter un document (audio/scan) à ce dossier existant"
+                                    title="Ajouter un document (audio/scan/image/vidéo) à ce dossier existant"
                                     onClick={() => { setOpenMenuRow(null); ouvrirAjoutDocument(r); }}
                                   >
                                     <IconPlus size={15} /> {ajoutLoading === r.pseudonyme ? 'Ajout…' : 'Ajouter un document'}
@@ -1226,14 +1282,14 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
                                 </div>
                                 <div className="actions-menu-group">
                                   <button
-                                    type="button" className="actions-menu-item" role="menuitem"
+                                    type="button" className="actions-menu-item action-coords" role="menuitem"
                                     title="Extraire les coordonnées de ce patient depuis les documents transcrits"
                                     onClick={() => { setOpenMenuRow(null); setExtractRow(r.pseudonyme); }}
                                   >
                                     <IconRefresh size={15} /> Extraire coordonnées
                                   </button>
                                   <button
-                                    type="button" className="actions-menu-item" role="menuitem"
+                                    type="button" className="actions-menu-item action-entites" role="menuitem"
                                     disabled={r.coordonnees_en_attente > 0}
                                     title={r.coordonnees_en_attente > 0
                                       ? 'Validez d\'abord les coordonnées de ce patient'
@@ -1254,8 +1310,7 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
                                     )}
                                   </button>
                                 </div>
-                              </div>
-                            )}
+                            </RowActionsMenu>
                           </div>
                         </div>
                       </td>

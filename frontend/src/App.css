@@ -667,6 +667,12 @@ tbody tr:hover {
 .actions-menu-item.risk-medium:hover:not(:disabled) { background: var(--amber-tint); }
 .actions-menu-item.risk-high { color: var(--error); }
 .actions-menu-item.risk-high:hover:not(:disabled) { background: var(--error-tint); }
+.actions-menu-item.action-add { color: var(--success); }
+.actions-menu-item.action-add:hover:not(:disabled) { background: var(--success-tint); }
+.actions-menu-item.action-coords { color: var(--blue); }
+.actions-menu-item.action-coords:hover:not(:disabled) { background: var(--blue-pale); }
+.actions-menu-item.action-entites { color: var(--amber); }
+.actions-menu-item.action-entites:hover:not(:disabled) { background: var(--amber-tint); }
 
 .pathology-photo {
   display: block;

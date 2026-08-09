@@ -16,14 +16,17 @@ const storage = multer.diskStorage({
   },
 });
 
-const ALLOWED_MIME_ENTITE = ['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/webp'];
+const ALLOWED_MIME_ENTITE = [
+  'application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/webp', 'image/heic', 'image/heif',
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska',
+];
 
 const uploadEntite = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 Mo
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 Mo (vidéos)
   fileFilter: (req, file, cb) => {
     if (!ALLOWED_MIME_ENTITE.includes(file.mimetype)) {
-      return cb(new Error('Format de fichier non autorisé (PDF ou image attendu).'));
+      return cb(new Error('Format de fichier non autorisé (PDF, image ou vidéo attendu).'));
     }
     cb(null, true);
   },

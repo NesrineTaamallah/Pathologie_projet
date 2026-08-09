@@ -1,13 +1,4 @@
--- ============================================================================
--- TABLE documents_bruts — un document uploadé par le clinicien (audio dicté
--- ou document scanné), AVANT pseudonymisation et extraction d'entités.
---
--- Volontairement indépendante de la table `patients` (registre pseudonymisé,
--- voir schema_registre.sql) : à ce stade du pipeline, seul le numéro de
--- dossier tel que saisi par le clinicien est connu. Le pseudonyme et le
--- rattachement aux tables SEP/EPR sont produits par l'étape suivante
--- (extraction d'entités / NER), pas ici.
--- ============================================================================
+
 
 CREATE TABLE IF NOT EXISTS documents_bruts (
     id                      SERIAL PRIMARY KEY,
@@ -17,7 +8,7 @@ CREATE TABLE IF NOT EXISTS documents_bruts (
     type_document           VARCHAR(30) NOT NULL CHECK (
         type_document IN ('visite', 'admission', 'prelevement_sang', 'eeg', 'emg', 'irm', 'autre')
     ),
-    type_entree             VARCHAR(10) NOT NULL CHECK (type_entree IN ('audio', 'scan')),
+    type_entree             VARCHAR(10) NOT NULL CHECK (type_entree IN ('audio', 'scan', 'video')),
     chemin_fichier          TEXT NOT NULL,
     nom_fichier_original    TEXT,
     texte_transcrit         TEXT,               -- rempli pour type_entree = 'audio' (WhisperX)
@@ -46,6 +37,7 @@ CREATE TABLE IF NOT EXISTS documents_bruts (
             'en_attente',            -- scan pas encore traité (OCR à venir)
             'transcrit',              -- audio transcrit avec succès
             'erreur_transcription',
+            'stocke',                 -- vidéo brute stockée sans traitement
             'pseudonymise'            -- traité par l'étape suivante (pseudonyme + entités attribués)
         )),
     created_at               TIMESTAMPTZ NOT NULL DEFAULT now()

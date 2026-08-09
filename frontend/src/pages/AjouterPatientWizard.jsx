@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import client from '../api/client';
 import {
   IconX, IconArrowLeft, IconArrowRight, IconUpload, IconCheckCircle,
-  IconAlert, IconFolder, IconHeart, IconActivity,
+  IconAlert, IconFolder, IconHeart, IconActivity, IconVideo,
 } from '../components/Icons';
 import ExtractionCoordonneesPanel from '../components/ExtractionCoordonneesPanel';
 
@@ -194,8 +194,10 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
   const acceptAttr = form.type_entree === 'audio'
     ? '.wav,.mp3,.m4a,.flac,audio/*'
     : form.type_entree === 'scan'
-      ? '.pdf,.png,.jpg,.jpeg,.tiff,image/*,application/pdf'
-      : undefined;
+      ? '.pdf,.png,.jpg,.jpeg,.tiff,.heic,image/*,application/pdf'
+      : form.type_entree === 'video'
+        ? '.mp4,.mov,.webm,.avi,.mkv,video/*'
+        : undefined;
 
   return (
     <div style={{
@@ -400,23 +402,40 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                     icon={<IconUpload size={18} />}
                     label="Audio"
                     sublabel="Dictée à transcrire automatiquement"
+                    accentColor="var(--success)"
+                    accentTint="var(--success-tint)"
                     onClick={() => { update('type_entree', 'audio'); setFile(null); }}
                   />
                   <PathologyCard
                     active={form.type_entree === 'scan'}
                     icon={<IconFolder size={18} />}
-                    label="Document scanné"
-                    sublabel="PDF ou image"
+                    label="Scan / Image"
+                    sublabel="PDF ou image (photo, scan)"
+                    accentColor="var(--amber)"
+                    accentTint="var(--amber-tint)"
                     onClick={() => { update('type_entree', 'scan'); setFile(null); }}
+                  />
+                  <PathologyCard
+                    active={form.type_entree === 'video'}
+                    icon={<IconVideo size={18} />}
+                    label="Vidéo"
+                    sublabel="Enregistrement vidéo (ex. EEG vidéo), stocké tel quel"
+                    accentColor="var(--blue)"
+                    accentTint="var(--blue-pale)"
+                    onClick={() => { update('type_entree', 'video'); setFile(null); }}
                   />
                 </div>
               </Field>
 
               {/* Le bouton d'upload n'apparaît qu'une fois le type d'entrée
-                  choisi (audio ou scan) — le type de document (visite,
+                  choisi (audio, scan ou vidéo) — le type de document (visite,
                   admission, ...) est déjà connu depuis l'étape précédente. */}
               {form.type_entree && (
-                <Field label={form.type_entree === 'audio' ? 'Fichier audio' : 'Fichier scanné'}>
+                <Field label={
+                  form.type_entree === 'audio' ? 'Fichier audio'
+                    : form.type_entree === 'scan' ? 'Fichier scanné ou image'
+                    : 'Fichier vidéo'
+                }>
                   <label
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
@@ -438,7 +457,9 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                           Glissez le fichier ici ou cliquez pour parcourir
                         </span>
                         <span style={{ fontSize: 11.5, color: 'var(--slate-soft)' }}>
-                          {form.type_entree === 'audio' ? 'WAV, MP3, M4A, FLAC' : 'PDF, PNG, JPG, TIFF'}
+                          {form.type_entree === 'audio' ? 'WAV, MP3, M4A, FLAC'
+                            : form.type_entree === 'scan' ? 'PDF, PNG, JPG, TIFF, HEIC'
+                            : 'MP4, MOV, WEBM, AVI, MKV'}
                         </span>
                       </>
                     )}
@@ -513,7 +534,11 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                 <SummaryRow label="Date d'inclusion" value={form.date_inclusion} />
               )}
               <SummaryRow label="Type de document" value={TYPES_DOCUMENT.find((t) => t.value === form.type_document)?.label} />
-              <SummaryRow label="Type d'entrée" value={form.type_entree === 'audio' ? 'Audio (transcription automatique)' : 'Document scanné'} />
+              <SummaryRow label="Type d'entrée" value={
+                form.type_entree === 'audio' ? 'Audio (transcription automatique)'
+                  : form.type_entree === 'scan' ? 'Document scanné / image'
+                  : 'Vidéo (stockée telle quelle)'
+              } />
               <SummaryRow label="Fichier" value={file?.name} />
               {form.type_entree === 'audio' && audioUrl && (
                 <audio controls src={audioUrl} style={{ width: '100%' }} />
@@ -521,7 +546,9 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
               <p style={{ fontSize: 12, color: 'var(--slate-soft)', marginTop: 6 }}>
                 {form.type_entree === 'audio'
                   ? "L'audio sera transcrit automatiquement (WhisperX) à la création du dossier."
-                  : "Le document sera traité automatiquement (OCR) à la création du dossier."}
+                  : form.type_entree === 'scan'
+                    ? "Le document sera traité automatiquement (OCR) à la création du dossier."
+                    : "La vidéo sera simplement stockée et rattachée au dossier, sans traitement automatique."}
               </p>
             </div>
           )}
@@ -567,6 +594,11 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                   <IconAlert size={13} /> La transcription automatique a échoué ; le fichier a bien été enregistré. Vous pouvez quitter sans valider — le document restera signalé comme non transcrit plutôt que d'apparaître à tort comme "en attente d'extraction".
                 </p>
               )}
+              {result.statut === 'stocke' && (
+                <p style={{ fontSize: 12.5, color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <IconVideo size={13} /> La vidéo a été enregistrée et rattachée au dossier. Elle est disponible au téléchargement depuis la fiche du patient.
+                </p>
+              )}
 
               {result.pseudonyme && texteValide && (
                 <div style={{ width: '100%', textAlign: 'left', marginTop: 4 }}>
@@ -598,7 +630,7 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
         borderTop: '1px solid var(--line)', background: 'var(--card)',
       }}>
         {result ? (
-          texteValide ? (
+          texteValide || result.statut === 'stocke' ? (
             <button onClick={onClose} style={{ ...primaryBtn, marginLeft: 'auto' }}>
               Terminer
             </button>
@@ -675,19 +707,19 @@ function Field({ label, children }) {
   );
 }
 
-function PathologyCard({ active, icon, label, sublabel, onClick }) {
+function PathologyCard({ active, icon, label, sublabel, onClick, accentColor = 'var(--teal)', accentTint = 'var(--teal-tint)' }) {
   return (
     <button
       onClick={onClick}
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start',
         padding: '16px 18px', borderRadius: 14, textAlign: 'left',
-        border: `1.5px solid ${active ? 'var(--teal)' : 'var(--line)'}`,
-        background: active ? 'var(--teal-tint)' : 'var(--card)',
+        border: `1.5px solid ${active ? accentColor : 'var(--line)'}`,
+        background: active ? accentTint : 'var(--card)',
       }}
     >
-      <span style={{ color: 'var(--teal-deep)' }}>{icon}</span>
-      <span style={{ fontSize: 14, fontWeight: 700, color: active ? 'var(--teal-deep)' : 'var(--ink)' }}>{label}</span>
+      <span style={{ color: accentColor }}>{icon}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: active ? accentColor : 'var(--ink)' }}>{label}</span>
       <span style={{ fontSize: 11.5, color: 'var(--slate-soft)' }}>{sublabel}</span>
     </button>
   );

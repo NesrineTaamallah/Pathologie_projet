@@ -24,7 +24,9 @@ const storage = multer.diskStorage({
 
 const ALLOWED_MIME = {
   audio: ['audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/flac'],
-  scan: ['application/pdf', 'image/png', 'image/jpeg', 'image/tiff'],
+  scan: ['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/heic', 'image/heif', 'image/webp'],
+  // Vidéo brute stockée telle quelle (ex. enregistrement EEG vidéo), sans transcription.
+  video: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska'],
 };
 
 const upload = multer({

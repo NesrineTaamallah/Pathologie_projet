@@ -228,6 +228,15 @@ export function IconDownload({ size = 18, color = 'currentColor' }) {
   ));
 }
 
+export function IconVideo({ size = 18, color = 'currentColor' }) {
+  return base(size, color, (
+    <>
+      <rect x="3.5" y="6.5" width="12" height="11" rx="2" />
+      <path d="M15.5 10.2l5-2.7v9l-5-2.7" />
+    </>
+  ));
+}
+
 export function IconMoon({ size = 18, color = 'currentColor' }) {
   return base(size, color, (
     <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />

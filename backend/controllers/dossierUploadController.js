@@ -8,7 +8,7 @@ const { genererPseudonyme } = require('../utils/pseudonymUtils');
 const { decrypt } = require('../utils/cryptoUtils');
 
 const TYPES_DOCUMENT = ['visite', 'admission', 'prelevement_sang', 'eeg', 'emg', 'irm', 'autre'];
-const TYPES_ENTREE = ['audio', 'scan'];
+const TYPES_ENTREE = ['audio', 'scan', 'video'];
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 const WHISPER_SCRIPT = path.join(__dirname, '..', 'scripts', 'whisper_transcribe.py');
@@ -313,6 +313,12 @@ async function creerDossier(req, res) {
       statut = 'erreur_transcription';
       await logAccess({ userId: req.user.sub, action: 'extraction_ocr', success: false, req });
     }
+  } else if (type_entree === 'video') {
+    // Vidéo brute (ex. enregistrement EEG vidéo) : simplement stockée et
+    // rattachée au dossier, sans transcription ni OCR — le clinicien la
+    // visionne/télécharge telle quelle depuis le dossier du patient.
+    statut = 'stocke';
+    await logAccess({ userId: req.user.sub, action: 'ajout_video', success: true, req });
   }
 
   try {
