@@ -1,4 +1,3 @@
-
 import io
 import textwrap
 
@@ -57,7 +56,6 @@ QUERY_ETIOLOGIE = """
         ON e.pseudonyme = r.pseudonyme
         AND e.etiologie_principale = TRUE
     WHERE r.presence_regression IS NOT NULL
-        AND r.presence_regression != 'NA'
         AND e.categorie_etiologique IS NOT NULL
         AND e.categorie_etiologique != 'NA'
 """
@@ -77,7 +75,6 @@ QUERY_GENE_TEMPLATE = """
         AND e.etiologie_principale = TRUE
         AND e.categorie_etiologique = 'Génétique'
     WHERE r.presence_regression IS NOT NULL
-        AND r.presence_regression != 'NA'
         AND g.gene_teste IS NOT NULL
         AND g.gene_teste != 'NA'
         AND g.classification_acmg IN ({classes})
@@ -109,11 +106,17 @@ def rapport_completude(engine):
         SELECT
             COUNT(*) AS n_lignes,
             COUNT(*) FILTER (WHERE presence_regression IS NULL) AS n_null,
-            COUNT(*) FILTER (WHERE presence_regression = 'NA') AS n_na,
-            COUNT(*) FILTER (WHERE presence_regression IS NOT NULL
-                              AND presence_regression != 'NA') AS n_exploitable
+            0 AS n_na,
+            COUNT(*) FILTER (WHERE presence_regression IS NOT NULL) AS n_exploitable
         FROM epr_regression_developpementale
     """)
+    # presence_regression est BOOLEAN en base (schema_registre.sql) : pas de
+    # convention 'NA' textuelle possible pour ce type (contrairement a
+    # categorie_etiologique, VARCHAR, juste en dessous). n_na est donc
+    # structurellement toujours 0 ; la comparaison "= 'NA'" sur un booleen
+    # faisait echouer toute la requete (psycopg2.errors.
+    # InvalidTextRepresentation), meme bug que age_debut_crises_mois
+    # (NUMERIC) dans test1_epr.py.
     comp_reg = pd.read_sql(q_regression, engine).iloc[0]
     log(f"\nTable epr_regression_developpementale :")
     log(f"  - lignes totales           : {comp_reg['n_lignes']}")

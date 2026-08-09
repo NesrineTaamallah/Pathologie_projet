@@ -126,6 +126,29 @@ def run_epr5(engine, config):
     return run_original_script(_epr("test5_epr.py"), overrides={"DB_URI": _db_uri()})
 
 
+def run_epr6(engine, config):
+    # test6_epr.py ne lit pas les variables d'env PG_* : il expose une
+    # constante DB_CONFIG (dict) en dur, qu'on substitue avec les vraies
+    # valeurs de connexion.
+    overrides = {
+        "DB_CONFIG": {
+            "host": PG_ENV["PGHOST"],
+            "port": int(PG_ENV["PGPORT"]),
+            "dbname": PG_ENV["PGDATABASE"],
+            "user": PG_ENV["PGUSER"],
+            "password": PG_ENV["PGPASSWORD"],
+        },
+    }
+    return run_original_script(_epr("test6_epr.py"), overrides=overrides)
+
+
+def run_epr7(engine, config):
+    # OUT_DIR est auto-redirige vers le dossier temporaire par
+    # run_original_script (voir script_runner._possede_constante) ; seul
+    # DB_URI doit etre substitue explicitement ici.
+    return run_original_script(_epr("test7_epr.py"), overrides={"DB_URI": _db_uri()})
+
+
 
 
 ANALYSES = {
@@ -176,5 +199,13 @@ ANALYSES = {
     "epr_5": {"registre": "EPR", "titre": "Analyse EPR #5",
               "description": "Voir docstring du script original pour le détail clinique.",
               "parametres_schema": {}, "run": run_epr5},
+    "epr_6": {"registre": "EPR", "titre": "Consanguinité parentale et étiologie génétique (AR)",
+              "description": "Chi² r×c consanguinité/étiologie (+ tendance Cochran-Armitage, "
+                              "sensibilité GEE intra-famille).",
+              "parametres_schema": {}, "run": run_epr6},
+    "epr_7": {"registre": "EPR", "titre": "QI et fréquence de crises (régression)",
+              "description": "Régression QI ~ fréquence de crises (+ durée d'épilepsie, VIF, "
+                              "diagnostics des résidus).",
+              "parametres_schema": {}, "run": run_epr7},
 
 }

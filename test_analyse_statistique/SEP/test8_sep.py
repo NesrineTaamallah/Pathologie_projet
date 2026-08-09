@@ -567,33 +567,61 @@ def fit_and_summarize(df_model: pd.DataFrame, predictors: list, y_col: str):
     logger.info("=" * 70)
     logger.info(f"REGRESSION LOGISTIQUE MULTIVARIEE — Outcome : {y_col} | Methode : {method}")
     logger.info("=" * 70)
-    logger.info("\n" + str(result.summary()))
+
+    # Le fallback L1 (methode == "l1_fallback") ne fournit pas toujours de
+    # matrice de covariance exploitable (Hessienne non inversible -- voir
+    # HessianInversionWarning). Dans ce cas .summary(), .conf_int() et
+    # .pvalues peuvent TOUS lever une exception (LinAlgError, AttributeError,
+    # TypeError selon le point de la chaine statsmodels concerne). On
+    # capture largement (Exception) plutot qu'une liste de types precise,
+    # car l'objectif est de degrader proprement l'analyse -- jamais de
+    # laisser planter toute la requete -- quelle que soit l'exception exacte
+    # levee par cette dependance externe.
+    ic_indisponibles = False
+
+    try:
+        logger.info("\n" + str(result.summary()))
+    except Exception as e:
+        ic_indisponibles = True
+        logger.warning(
+            f"[modele] result.summary() indisponible ({type(e).__name__}: {e}) -> "
+            f"methode='{method}'. Cause probable : quasi-separation (Hessienne non "
+            "inversible sur le fallback L1)."
+        )
+
     params = result.params
     try:
         conf = result.conf_int()
         conf.columns = ["IC95%_bas", "IC95%_haut"]
-    except (np.linalg.LinAlgError, ValueError) as e:
-        # Cas frequent avec le fallback L1 (methode == "l1_fallback") : la
-        # Hessienne du modele n'a pas pu etre inversee (voir
-        # HessianInversionWarning juste avant dans les logs), generalement
-        # parce que le taux d'evenements est trop extreme pour l'effectif
-        # (ex. 90% d'evenements sur n=30 -> quasi-separation). Les IC95%
-        # ne sont alors pas calculables de facon fiable : on degrade
-        # proprement au lieu de laisser planter toute l'analyse.
+    except Exception as e:
+        ic_indisponibles = True
+        conf = pd.DataFrame({"IC95%_bas": np.nan, "IC95%_haut": np.nan}, index=params.index)
+        logger.warning(f"[modele] conf_int() indisponible ({type(e).__name__}: {e}).")
+
+    try:
+        p_values = result.pvalues
+    except Exception as e:
+        ic_indisponibles = True
+        p_values = pd.Series(np.nan, index=params.index)
+        logger.warning(f"[modele] pvalues indisponibles ({type(e).__name__}: {e}).")
+
+    if ic_indisponibles:
+        # Taux d'evenements tres eleve/faible sur petit effectif : les IC95%
+        # et p-values ne sont pas calculables de facon fiable pour cette
+        # methode. On le signale explicitement dans le nom de methode plutot
+        # que de laisser une erreur bloquer toute l'analyse.
         logger.warning(
-            f"[modele] IC95% non calculables ({type(e).__name__}: {e}) -> methode='{method}', "
+            f"[modele] IC95%/p-values non calculables pour '{y_col}' -> methode='{method}', "
             f"taux d'evenements = {100*y.mean():.1f}% sur n={len(y)}. Cause probable : "
-            "quasi-separation (effectif trop petit face au taux d'evenements observe). "
-            "IC affiches comme non disponibles (NaN)."
-        )
-        conf = pd.DataFrame(
-            {"IC95%_bas": np.nan, "IC95%_haut": np.nan}, index=params.index
+            "quasi-separation (effectif trop petit face au taux d'evenements observe)."
         )
         method = f"{method}_ic_indisponible"
-    or_table = pd.DataFrame({"OR": np.exp(params), "IC95%_bas": np.exp(conf["IC95%_bas"]), "IC95%_haut": np.exp(conf["IC95%_haut"]), "p_value": result.pvalues})
+
+    or_table = pd.DataFrame({"OR": np.exp(params), "IC95%_bas": np.exp(conf["IC95%_bas"]), "IC95%_haut": np.exp(conf["IC95%_haut"]), "p_value": p_values})
     logger.info("\n[Odds Ratios]\n" + or_table.to_string())
     logger.info(interpret_odds_ratios(or_table))
     return result, or_table, method
+
 
 
 

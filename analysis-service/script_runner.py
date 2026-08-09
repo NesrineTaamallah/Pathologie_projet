@@ -1,4 +1,3 @@
-
 import contextlib
 import io
 import os
@@ -46,6 +45,19 @@ def _substituer_constantes(source: str, overrides: dict) -> str:
     return source
 
 
+def _possede_constante(source: str, nom: str) -> bool:
+    """Vrai si `nom` est assigne au niveau module dans `source` (ex: OUT_DIR = "...").
+    Sert a auto-injecter le dossier de sortie temporaire pour les scripts qui
+    exposent une constante OUT_DIR/OUTPUT_DIR mais ne lisent pas os.environ
+    (cas de test7_epr.py, qui ecrit en dur OUT_DIR = "/mnt/user-data/outputs")."""
+    arbre = ast.parse(source)
+    return any(
+        isinstance(n, ast.Assign) and len(n.targets) == 1
+        and isinstance(n.targets[0], ast.Name) and n.targets[0].id == nom
+        for n in arbre.body
+    )
+
+
 def run_original_script(
     chemin_script: str,
     overrides: dict | None = None,
@@ -58,19 +70,43 @@ def run_original_script(
     reponses_stdin  : réponses aux éventuels input(), dans l'ordre où ils apparaissent.
     env_overrides   : variables d'environnement (ex: PGHOST, OUTPUT_DIR...).
     """
-    overrides = overrides or {}
+    overrides = dict(overrides or {})
     reponses_stdin = reponses_stdin or []
     env_overrides = env_overrides or {}
 
     with open(chemin_script, encoding="utf-8") as f:
         source = f.read()
-    source = _substituer_constantes(source, overrides)
 
     dossier_sortie = tempfile.mkdtemp(prefix="analyse_")
+
+    # Auto-injection : certains scripts (ex. test7_epr.py) exposent une
+    # constante OUT_DIR/OUTPUT_DIR en dur au lieu de lire os.environ. On la
+    # redirige vers le dossier temporaire si l'appelant ne l'a pas deja fixee
+    # explicitement, pour que les figures/CSV generes soient bien recuperes
+    # ci-dessous au lieu d'atterrir dans /mnt/user-data/outputs partage par
+    # toutes les requetes.
+    for nom_const in ("OUT_DIR", "OUTPUT_DIR"):
+        if nom_const not in overrides and _possede_constante(source, nom_const):
+            overrides[nom_const] = dossier_sortie
+
+    source = _substituer_constantes(source, overrides)
+
     env_sauvegarde = dict(os.environ)
     os.environ.update(env_overrides)
     os.environ.setdefault("OUTPUT_DIR", dossier_sortie)
     os.environ.setdefault("SEP_OUTPUT_DIR", dossier_sortie)
+
+    # Certains scripts (ex. test6_epr.py) ecrivent leurs fichiers de sortie
+    # avec des chemins RELATIFS (ex. "rapport_analyse_chi2.txt", sans
+    # constante OUT_DIR a substituer). On se place dans le dossier temporaire
+    # le temps de l'execution pour que ces fichiers y atterrissent aussi et
+    # soient recuperes -- sans avoir a toucher au script original.
+    # NB : os.chdir() est global au processus ; si le serveur traite des
+    # requetes EPR en parallele (plusieurs workers/threads), ce chdir partage
+    # peut interferer entre requetes concurrentes. Sans incidence pour un
+    # usage sequentiel (dev, un seul utilisateur a la fois).
+    cwd_sauvegarde = os.getcwd()
+    os.chdir(dossier_sortie)
 
     stdout_capture = io.StringIO()
     input_original = builtins.input
@@ -83,6 +119,7 @@ def run_original_script(
             exec(code, namespace)
     finally:
         builtins.input = input_original
+        os.chdir(cwd_sauvegarde)
         os.environ.clear()
         os.environ.update(env_sauvegarde)
 

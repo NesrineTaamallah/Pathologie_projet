@@ -33,7 +33,7 @@ async function rechercherCim11(req, res) {
     // Condition : chaque mot doit apparaître (approximativement) dans search_text,
     // combinée avec un score de similarité globale sur la requête complète
     const wordConditions = mots
-      .map((_, i) => `unaccent(lower($${i + 2})) <% cim11_codes.search_text`)
+      .map((_, i) => `immutable_unaccent(lower($${i + 2})) <% cim11_codes.search_text`)
       .join(' OR ');
 
     const params = [q, ...mots];
@@ -42,15 +42,15 @@ async function rechercherCim11(req, res) {
       SELECT
         id, chapter, code, title, class_kind, parent_code, uri, definition,
         GREATEST(
-          similarity(unaccent(lower(title)), unaccent(lower($1))),
-          word_similarity(unaccent(lower($1)), search_text)
+          similarity(immutable_unaccent(lower(title)), immutable_unaccent(lower($1))),
+          word_similarity(immutable_unaccent(lower($1)), search_text)
         ) AS score
       FROM cim11_codes
       WHERE
         ${codeMatch ? 'lower(code) = lower($1) OR' : ''}
-        unaccent(lower(title)) % unaccent(lower($1))
-        OR search_text % unaccent(lower($1))
-        ${mots.length > 1 ? `OR (${wordConditions})` : ''}
+        immutable_unaccent(lower(title)) % immutable_unaccent(lower($1))
+        OR search_text % immutable_unaccent(lower($1))
+        OR (${wordConditions})
       ORDER BY
         (lower(code) = lower($1)) DESC,
         score DESC NULLS LAST
@@ -67,7 +67,7 @@ async function rechercherCim11(req, res) {
       const motsSignificatifs = mots.filter((m) => m.length >= 3);
       if (motsSignificatifs.length > 0) {
         const ilikeConds = motsSignificatifs
-          .map((_, i) => `unaccent(lower(title)) ILIKE '%' || unaccent(lower($${i + 1})) || '%'`)
+          .map((_, i) => `immutable_unaccent(lower(title)) ILIKE '%' || immutable_unaccent(lower($${i + 1})) || '%'`)
           .join(' OR ');
         const { rows: rows2 } = await pool.query(
           `SELECT id, chapter, code, title, class_kind, parent_code, uri, definition, 0.1 AS score

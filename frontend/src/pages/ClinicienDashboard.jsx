@@ -212,7 +212,7 @@ export default function ClinicienDashboard() {
         </header>
 
         <div className="dashboard" style={{ maxWidth: 1120 }}>
-          {tab !== 'analyses' && tab !== 'patients' && tab !== 'overview' && tab !== 'registre-sep' && tab !== 'registre-epr' && tab !== 'entites' && (
+          {tab !== 'analyses' && tab !== 'patients' && tab !== 'overview' && tab !== 'registre-sep' && tab !== 'registre-epr' && tab !== 'entites' && tab !== 'cim11' && (
             <div style={{
               padding: '40px 20px', textAlign: 'center', color: 'var(--slate)',
               border: '1px dashed var(--border)', borderRadius: 14, background: 'var(--surface)',

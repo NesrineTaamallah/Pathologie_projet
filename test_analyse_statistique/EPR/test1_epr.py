@@ -43,7 +43,14 @@ WITH base AS (
     LEFT JOIN epr_pharmacoresistance pr ON pr.pseudonyme = ic.pseudonyme
     LEFT JOIN epr_suivi su ON su.pseudonyme = ic.pseudonyme
     WHERE ic.age_debut_crises_mois IS NOT NULL
-      AND ic.age_debut_crises_mois != 'NA'
+      -- age_debut_crises_mois est NUMERIC en base (schema_registre.sql) :
+      -- le comparer a la chaine 'NA' fait echouer la requete entiere
+      -- (psycopg2.errors.InvalidTextRepresentation, Postgres ne sait pas
+      -- caster 'NA' en numeric). IS NOT NULL suffit deja a exclure les
+      -- valeurs manquantes pour une colonne numerique -- pas de convention
+      -- 'NA' textuelle a filtrer ici (contrairement a des champs VARCHAR
+      -- comme type_crise_ilae2017 ci-dessous, ou severite dans le registre
+      -- SEP, qui utilisent 'NA' comme valeur determinee et non manquante).
 ),
 
 etio AS (
@@ -99,9 +106,13 @@ SELECT
     END AS categorie_age_debut,
 
     b.statut_pharmacoresistance_confirme,
-    CASE WHEN b.statut_pharmacoresistance_confirme = 'Oui' THEN 1 ELSE 0 END AS event_pharmacoresistance,
+    -- statut_pharmacoresistance_confirme est BOOLEAN en base
+    -- (schema_registre.sql), pas de valeurs textuelles 'Oui'/'Non' :
+    -- comparer un booleen a une chaine echoue avec
+    -- psycopg2.errors.InvalidTextRepresentation. On compare a TRUE/FALSE.
+    CASE WHEN b.statut_pharmacoresistance_confirme = TRUE THEN 1 ELSE 0 END AS event_pharmacoresistance,
     CASE
-        WHEN b.statut_pharmacoresistance_confirme = 'Oui'
+        WHEN b.statut_pharmacoresistance_confirme = TRUE
              THEN b.age_diagnostic_pharmacoresistance_mois - b.age_debut_crises_mois
         ELSE b.duree_suivi_mois
     END AS duree_mois,
@@ -129,13 +140,13 @@ LEFT JOIN nb_ae na            ON na.pseudonyme = b.pseudonyme
 
 WHERE
     (
-        b.statut_pharmacoresistance_confirme = 'Oui'
+        b.statut_pharmacoresistance_confirme = TRUE
         AND b.age_diagnostic_pharmacoresistance_mois IS NOT NULL
         AND b.age_diagnostic_pharmacoresistance_mois > b.age_debut_crises_mois
     )
     OR
     (
-        b.statut_pharmacoresistance_confirme = 'Non'
+        b.statut_pharmacoresistance_confirme = FALSE
         AND b.duree_suivi_mois IS NOT NULL
         AND b.duree_suivi_mois > 0
     );

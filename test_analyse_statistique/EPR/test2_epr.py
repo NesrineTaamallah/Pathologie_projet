@@ -1,5 +1,3 @@
-
-
 import os
 import sys
 import warnings
@@ -48,9 +46,14 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) fc ON TRUE
 WHERE v.etiologie_principale IS NOT NULL
-  AND v.etiologie_principale <> 'NA'
   AND pr.statut_pharmacoresistance_confirme IS NOT NULL
-  AND pr.statut_pharmacoresistance_confirme <> 'NA';
+  -- Les deux colonnes sont BOOLEAN en base (schema_registre.sql) : pas de
+  -- convention 'NA' textuelle possible pour ce type, IS NOT NULL suffit
+  -- deja a exclure les valeurs manquantes. Comparer un BOOLEAN a la chaine
+  -- 'NA' fait echouer toute la requete (psycopg2.errors.
+  -- InvalidTextRepresentation), meme bug que age_debut_crises_mois (NUMERIC)
+  -- dans test1_epr.py.
+;
 """
 
 QUERY_CONTROLE_DOUBLONS_ETIOLOGIE = """

@@ -10,42 +10,43 @@
  */
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 const pool = require('../config/db');
 
-// Petit parseur CSV tolérant aux guillemets et virgules internes
-function parseCsvLine(line) {
-  const out = [];
+async function importFile(filePath) {
+  // Lecture caractère par caractère pour gérer correctement les champs
+  // multi-lignes (définitions contenant des retours à la ligne entre guillemets)
+  const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+
+  const rows = [];
+  let row = [];
   let cur = '';
   let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
+  let i = 0;
+  const len = raw.length;
+
+  while (i < len) {
+    const c = raw[i];
     if (inQuotes) {
       if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
-      } else {
-        cur += c;
+        if (raw[i + 1] === '"') { cur += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
       }
-    } else if (c === '"') {
-      inQuotes = true;
-    } else if (c === ',') {
-      out.push(cur);
-      cur = '';
-    } else {
-      cur += c;
+      cur += c; i++; continue;
     }
+    if (c === '"') { inQuotes = true; i++; continue; }
+    if (c === ',') { row.push(cur); cur = ''; i++; continue; }
+    if (c === '\r') { i++; continue; }
+    if (c === '\n') {
+      row.push(cur); cur = '';
+      rows.push(row); row = [];
+      i++; continue;
+    }
+    cur += c; i++;
   }
-  out.push(cur);
-  return out;
-}
+  if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
 
-async function importFile(filePath) {
-  const rl = readline.createInterface({
-    input: fs.createReadStream(filePath, { encoding: 'utf8' }),
-    crlfDelay: Infinity,
-  });
-
-  let header = null;
+  if (rows.length === 0) return;
+  const header = rows[0].map((h) => h.trim());
   let buffer = [];
   let count = 0;
 
@@ -53,12 +54,20 @@ async function importFile(filePath) {
     if (buffer.length === 0) return;
     const values = [];
     const placeholders = [];
-    buffer.forEach((row, idx) => {
+    buffer.forEach((r, idx) => {
       const base = idx * 7;
       placeholders.push(
         `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`
       );
-      values.push(row.chapter, row.code || null, row.title, row.classKind, row.parent_code || null, row.uri || null, row.definition || null);
+      values.push(
+        (r.chapter || '').slice(0, 10) || null,
+        (r.code || '').slice(0, 20) || null,
+        r.title,
+        (r.classKind || '').slice(0, 20) || null,
+        (r.parent_code || '').slice(0, 20) || null,
+        r.uri || null,
+        r.definition || null
+      );
     });
     const sql = `
       INSERT INTO cim11_codes (chapter, code, title, class_kind, parent_code, uri, definition)
@@ -69,18 +78,13 @@ async function importFile(filePath) {
     buffer = [];
   };
 
-  for await (const line of rl) {
-    if (!line.trim()) continue;
-    const cleaned = line.replace(/^\uFEFF/, ''); // enlève le BOM éventuel
-    const cols = parseCsvLine(cleaned);
-    if (!header) {
-      header = cols.map((h) => h.trim());
-      continue;
-    }
-    const row = {};
-    header.forEach((h, i) => { row[h] = cols[i]; });
-    if (!row.title) continue;
-    buffer.push(row);
+  for (let r = 1; r < rows.length; r++) {
+    const cols = rows[r];
+    if (cols.length === 1 && cols[0].trim() === '') continue; // ligne vide
+    const rowObj = {};
+    header.forEach((h, idx) => { rowObj[h] = cols[idx]; });
+    if (!rowObj.title) continue;
+    buffer.push(rowObj);
     if (buffer.length >= 500) await flush();
   }
   await flush();

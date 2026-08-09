@@ -1,9 +1,10 @@
 -- Migration : intégration CIM-11 (ICD-11) avec recherche floue (fuzzy search)
 -- À exécuter APRES les migrations existantes (via backend/scripts/run-migration.js)
 
--- 1. Extension pg_trgm pour la similarité de texte (tolère fautes, accents, variantes)
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
+-- Extensions pg_trgm et unaccent : à créer manuellement une seule fois si absentes
+--   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+--   CREATE EXTENSION IF NOT EXISTS unaccent;
+-- (déjà fait avant de lancer cette migration)
 
 -- 1bis. unaccent() est marquée STABLE par PostgreSQL (dépend du search_path),
 -- ce qui est refusé dans une colonne générée (GENERATED ALWAYS ... STORED)
@@ -11,8 +12,9 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 -- qui fixe explicitement le dictionnaire 'unaccent'.
 CREATE OR REPLACE FUNCTION immutable_unaccent(text)
 RETURNS text AS $$
-  SELECT unaccent('public.unaccent'::regdictionary, $1)
-$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+  SELECT unaccent($1)
+$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT
+   SET search_path = public, pg_catalog;
 
 -- 2. Table des codes CIM-11
 CREATE TABLE IF NOT EXISTS cim11_codes (
