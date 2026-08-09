@@ -2930,13 +2930,29 @@ def extraire_incremental(table_cfg, etat_table, texte_fenetre):
 # ---------------------------------------------------------------------------
 # ## Orchestration streaming (section 11 du notebook) — inchangé
 # ---------------------------------------------------------------------------
-def extraire_dossier_streaming(chunks, tables_config, registre_label, etat_initial=None):
+def extraire_dossier_streaming(chunks, tables_config, registre_label, etat_initial=None,
+                                appliquer_rattrapage=False, appliquer_verification=False):
     """etat_initial (optionnel) : donnees deja enregistrees en base pour ce
-    patient (une visite precedente, une saisie manuelle...), au format
-    {nom_table: {...} ou [...]}. Si fourni, sert de POINT DE DEPART de
-    l'etat streaming -> le LLM les voit comme "deja connu" des le 1er chunk
-    (meme mecanisme que l'etat accumule chunk par chunk, section 7/8 du
-    notebook), et la fusion a verrous durs s'applique normalement dessus."""
+    patient (visites precedentes, saisie manuelle...), au format
+    {nom_table: {...} ou [...]}. Sert de POINT DE DEPART -> le LLM les voit
+    comme "deja connu" des le 1er chunk de CETTE visite, exactement comme un
+    chunk deja traite (meme mecanisme, section 7/8 du notebook).
+
+    IMPORTANT (cas d'usage "petit audio par visite") : par defaut
+    appliquer_rattrapage=False et appliquer_verification=False. Ces deux
+    passages du notebook original ont ete concus pour un dossier COMPLET
+    traite en une fois ; ici, chaque appel ne recoit que le texte d'UNE
+    visite (quelques chunks de ~30s). Si on les laissait actives par
+    defaut :
+    - le rattrapage forcerait un appel LLM sur les ~25 tables non
+      mentionnees a CHAQUE visite (cout inutile, cette visite ne les
+      concerne simplement pas) ;
+    - la verification comparerait TOUT l'etat (y compris les valeurs
+      venues de etat_initial, remontant a des visites anterieures) au
+      texte de cette seule visite -> tout ce qui n'y est pas repete
+      serait a tort marque "non soutenu par le texte" et efface.
+    Utilise ces flags uniquement pour un appel de fin de dossier complet
+    (ex. cloture finale d'un patient, tout le texte cumule en entree)."""
     etat = {t["table"]: ([] if t["repetee"] else {c["nom"]: None for c in t["champs"]})
             for t in tables_config}
     if etat_initial:
@@ -2980,27 +2996,29 @@ def extraire_dossier_streaming(chunks, tables_config, registre_label, etat_initi
                                  "n_occurrences_renvoyees_par_llm": len(nouvelles) if table_cfg["repetee"] else None,
                                  "delta_etat": n_ajouts})
 
-    # Passage de rattrapage : toute table jamais déclenchée par aucun chunk
-    tables_jamais_declenchees = [t for t in tables_config
-                                  if not any(j["table"] == t["table"] for j in journal)]
-    for table_cfg in tables_jamais_declenchees:
-        table_name = table_cfg["table"]
-        avant = etat[table_name]
-        nouvelles = extraire_incremental(table_cfg, avant, texte_dossier_complet)
-        n_appels_llm_total += 1
+    # Passage de rattrapage : DESACTIVE par defaut (voir docstring). Utile
+    # seulement en fin de dossier complet, pas visite par visite.
+    if appliquer_rattrapage:
+        tables_jamais_declenchees = [t for t in tables_config
+                                      if not any(j["table"] == t["table"] for j in journal)]
+        for table_cfg in tables_jamais_declenchees:
+            table_name = table_cfg["table"]
+            avant = etat[table_name]
+            nouvelles = extraire_incremental(table_cfg, avant, texte_dossier_complet)
+            n_appels_llm_total += 1
 
-        if table_cfg["repetee"]:
-            apres = fusionner_occurrences_repetee(table_cfg, avant, nouvelles)
-            n_ajouts = len(apres) - len(avant)
-        else:
-            apres = fusionner_champs_simples(table_cfg, avant, nouvelles)
-            n_ajouts = sum(1 for k in apres if apres.get(k) != (avant or {}).get(k))
-        etat[table_name] = apres
+            if table_cfg["repetee"]:
+                apres = fusionner_occurrences_repetee(table_cfg, avant, nouvelles)
+                n_ajouts = len(apres) - len(avant)
+            else:
+                apres = fusionner_champs_simples(table_cfg, avant, nouvelles)
+                n_ajouts = sum(1 for k in apres if apres.get(k) != (avant or {}).get(k))
+            etat[table_name] = apres
 
-        if n_ajouts != 0 or (table_cfg["repetee"] and nouvelles):
-            journal.append({"chunk_idx": None, "table": table_name,
-                             "n_occurrences_renvoyees_par_llm": len(nouvelles) if table_cfg["repetee"] else None,
-                             "delta_etat": n_ajouts})
+            if n_ajouts != 0 or (table_cfg["repetee"] and nouvelles):
+                journal.append({"chunk_idx": None, "table": table_name,
+                                 "n_occurrences_renvoyees_par_llm": len(nouvelles) if table_cfg["repetee"] else None,
+                                 "delta_etat": n_ajouts})
 
     # Post-traitement final : evidence_span + validation déterministe (réutilise ton service)
     resultats, erreurs = {}, []
@@ -3012,16 +3030,22 @@ def extraire_dossier_streaming(chunks, tables_config, registre_label, etat_initi
         if issues:
             erreurs.append({"table": table_name, "issues": issues})
 
-    # Vérification ciblée finale (réutilise verifier_table déjà en place)
-    verification_tables = VERIFICATION_TABLES_EPR if registre_label == "EPR" else VERIFICATION_TABLES_SEP
-    for table_name in verification_tables:
-        table_cfg = TABLES_BY_NAME[table_name]
-        corrige, meta_verif = verifier_table(table_cfg, resultats[table_name], texte_dossier_complet)
-        if meta_verif.get("divergence_detectee"):
-            corrige = attach_evidence(corrige, table_cfg, texte_dossier_complet)
-            _, issues2 = validate_result({table_name: corrige}, table_cfg, texte_dossier_complet)
-            resultats[table_name] = corrige
-    n_appels_llm_total += len(verification_tables)
+    # Vérification ciblée finale : DESACTIVEE par defaut (voir docstring).
+    # Si activée, restreinte aux SEULES tables réellement touchées par CETTE
+    # visite (journal) — jamais aux tables qui n'ont que des valeurs héritées
+    # de etat_initial, pour ne jamais effacer une donnée d'une visite
+    # antérieure sous prétexte qu'elle n'est pas répétée dans ce court texte.
+    if appliquer_verification:
+        verification_tables = VERIFICATION_TABLES_EPR if registre_label == "EPR" else VERIFICATION_TABLES_SEP
+        tables_touchees_cette_visite = {j["table"] for j in journal}
+        for table_name in verification_tables & tables_touchees_cette_visite:
+            table_cfg = TABLES_BY_NAME[table_name]
+            corrige, meta_verif = verifier_table(table_cfg, resultats[table_name], texte_dossier_complet)
+            if meta_verif.get("divergence_detectee"):
+                corrige = attach_evidence(corrige, table_cfg, texte_dossier_complet)
+                _, issues2 = validate_result({table_name: corrige}, table_cfg, texte_dossier_complet)
+                resultats[table_name] = corrige
+            n_appels_llm_total += 1
 
     if registre_label == "EPR" and "epr_etiologie" in resultats:
         resultats["epr_etiologie"], etio_issue = enforce_unique_etiologie_principale(resultats["epr_etiologie"])
@@ -3049,6 +3073,13 @@ class ExtractionRequestStreaming(BaseModel):
     # "memoire" injectee au LLM des le depart -> pas de duplication/contradiction
     # avec ce qui a deja ete saisi lors d'une visite precedente.
     etat_initial: dict | None = None
+    # False (defaut) = usage normal, un appel par petite visite/consultation :
+    #   rattrapage et verification finale desactives (voir docstring de
+    #   extraire_dossier_streaming - eviter d'effacer les donnees de visites
+    #   anterieures faute d'etre repetees dans le court texte de CETTE visite).
+    # True = a utiliser seulement pour un appel de cloture sur le texte
+    #   cumule de tout le dossier (rare, ex. relecture finale avant export).
+    finaliser: bool = False
 
 
 @app.post("/extract-entites-streaming")
@@ -3065,7 +3096,10 @@ def extract_entites_streaming(req: ExtractionRequestStreaming):
 
     try:
         resultat = extraire_dossier_streaming(
-            chunks_dossier, tables_config, req.registre, etat_initial=req.etat_initial,
+            chunks_dossier, tables_config, req.registre,
+            etat_initial=req.etat_initial,
+            appliquer_rattrapage=req.finaliser,
+            appliquer_verification=req.finaliser,
         )
     except NameError as exc:
         raise HTTPException(500, f"Service mal configuré : import manquant ({exc}).")
