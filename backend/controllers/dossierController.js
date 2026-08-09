@@ -101,6 +101,18 @@ async function listDossiers(req, res) {
        ORDER BY date_inclusion DESC NULLS LAST, created_at DESC`
     );
 
+    // Pour piloter l'affichage/activation du bouton "Extraire les entités
+    // médicales" : coordonnées déjà validées ? entités déjà extraites (ou en attente) ?
+    const statutExtractionResult = await pool.query(`
+      SELECT p.pseudonyme,
+             COUNT(d.id) FILTER (WHERE d.texte_transcrit IS NOT NULL AND TRIM(d.texte_transcrit) <> '' AND d.coordonnees_extraites = false)::int AS coordonnees_en_attente,
+             COUNT(d.id) FILTER (WHERE d.texte_transcrit IS NOT NULL AND TRIM(d.texte_transcrit) <> '' AND d.coordonnees_extraites = true AND COALESCE(d.entites_extraites, false) = false)::int AS entites_en_attente
+      FROM patients p
+      LEFT JOIN documents_bruts d ON d.pseudonyme = p.pseudonyme
+      GROUP BY p.pseudonyme
+    `);
+    const statutByPseudo = new Map(statutExtractionResult.rows.map((r) => [r.pseudonyme, r]));
+
     const dateUnion = DATE_SOURCES
       .map(([table, col]) => `SELECT pseudonyme, ${col} AS d FROM ${table}`)
       .join(' UNION ALL ');
@@ -147,6 +159,8 @@ async function listDossiers(req, res) {
     const rows = patientsResult.rows.map((p) => ({
       ...p,
       derniere_visite: derniereVisiteByPseudo.get(p.pseudonyme) || null,
+      coordonnees_en_attente: statutByPseudo.get(p.pseudonyme)?.coordonnees_en_attente ?? 0,
+      entites_en_attente: statutByPseudo.get(p.pseudonyme)?.entites_en_attente ?? 0,
       completude: computeCompletude(
         rowsByTableByPseudo[p.pseudonyme] || {},
         COMPLETUDE_TABLES[p.registre] || [],

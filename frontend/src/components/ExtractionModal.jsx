@@ -20,6 +20,18 @@ function fmtDate(d) {
   return date.toLocaleDateString('fr-FR');
 }
 
+const STATUT_STYLE = {
+  nouveau:    { label: 'Nouveau',                       bg: '#e6f4ea', fg: '#1e7e34', border: '#a6d9b3' },
+  confirme:   { label: 'Confirmé',                      bg: '#eef2ff', fg: '#3949ab', border: '#c5cef5' },
+  conflit:    { label: '⚠ Diffère de la base',           bg: '#fdecea', fg: '#b3261e', border: '#f3b8b3' },
+  existant:   { label: 'Déjà en base (non mentionné ici)', bg: '#f1f3f4', fg: '#5f6368', border: '#dcdde0' },
+  verrouille: { label: '🔒 Verrouillé (base conservée)',  bg: '#f1f3f4', fg: '#5f6368', border: '#dcdde0' },
+  vide:       null,
+};
+
+// Alignés avec le backend : ces champs restent éditables même s'ils existent déjà.
+const CHAMPS_TOUJOURS_MODIFIABLES = ['telephone', 'adresse', 'num_cnam', 'cin'];
+
 
 export default function ExtractionModal({ pseudonyme, onClose, onAllDone }) {
   const [documents, setDocuments] = useState(null); 
@@ -69,10 +81,11 @@ export default function ExtractionModal({ pseudonyme, onClose, onAllDone }) {
     setSaving((s) => ({ ...s, [doc.id]: true }));
     setErrors((e) => ({ ...e, [doc.id]: '' }));
     try {
+      const { _statuts, _valeurs_existantes, ...valeurs } = results[doc.id];
       await client.post('/api/coordonnees', {
         pseudonyme: pseudonymeResolu,
         document_id: doc.id,
-        ...results[doc.id],
+        ...valeurs,
       });
       setSaved((s) => ({ ...s, [doc.id]: true }));
       setDocuments((docs) => {
@@ -185,23 +198,52 @@ export default function ExtractionModal({ pseudonyme, onClose, onAllDone }) {
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {CHAMPS.map(({ key, label: champLabel, multi }) => (
-                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--slate)' }}>
-                        {champLabel}
-                        {multi && <span style={{ fontWeight: 400, color: 'var(--slate-soft)' }}> (virgules)</span>}
-                      </label>
-                      <input
-                        value={results[doc.id][key] || ''}
-                        onChange={(e) => updateField(doc.id, key, e.target.value)}
-                        placeholder="—"
-                        style={{
-                          padding: '7px 9px', borderRadius: 8, border: '1.5px solid var(--line)',
-                          fontSize: 12, background: 'var(--paper)', boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  ))}
+                  {CHAMPS.map(({ key, label: champLabel, multi }) => {
+                    const statut = results[doc.id]._statuts?.[key];
+                    const style = STATUT_STYLE[statut];
+                    const ancienneValeur = results[doc.id]._valeurs_existantes?.[key];
+                    const valeur = results[doc.id][key] || '';
+                    const verrouille = !CHAMPS_TOUJOURS_MODIFIABLES.includes(key) && statut === 'verrouille';
+                    return (
+                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--slate)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {champLabel}
+                          {multi && <span style={{ fontWeight: 400, color: 'var(--slate-soft)' }}> (virgules)</span>}
+                          {style && (
+                            <span style={{
+                              fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
+                              background: style.bg, color: style.fg, border: `1px solid ${style.border}`,
+                              textTransform: 'none', letterSpacing: 0,
+                            }}>
+                              {style.label}
+                            </span>
+                          )}
+                          {verrouille && (
+                            <span title="Non modifiable" style={{ fontSize: 11, color: 'var(--slate-soft)' }}>🔒</span>
+                          )}
+                        </label>
+                        <input
+                          value={valeur}
+                          onChange={(e) => !verrouille && updateField(doc.id, key, e.target.value)}
+                          readOnly={verrouille}
+                          placeholder="—"
+                          style={{
+                            padding: '7px 9px', borderRadius: 8,
+                            border: `1.5px solid ${statut === 'conflit' ? '#f3b8b3' : 'var(--line)'}`,
+                            fontSize: 12, boxSizing: 'border-box',
+                            background: verrouille ? 'var(--line)' : 'var(--paper)',
+                            color: verrouille ? 'var(--slate)' : 'inherit',
+                            cursor: verrouille ? 'not-allowed' : 'text',
+                          }}
+                        />
+                        {statut === 'conflit' && ancienneValeur && (
+                          <span style={{ fontSize: 10.5, color: '#b3261e' }}>
+                            Valeur en base : {ancienneValeur} — vérifier manuellement avant correction
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>

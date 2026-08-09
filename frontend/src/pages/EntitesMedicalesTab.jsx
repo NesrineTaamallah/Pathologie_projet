@@ -5,6 +5,7 @@ import { SectionHeading } from '../components/DashboardWidgets';
 import LineChartSVG from '../components/ClinicalChart';
 import AjouterPatientWizard from './AjouterPatientWizard';
 import ExtractionModal from '../components/ExtractionModal';
+import ExtractionEntitesModal from '../components/ExtractionEntitesModal';
 import {
   IconEye, IconPlus, IconSearch, IconFolder, IconAlert,
   IconUsers, IconHistory, IconActivity, IconTarget, IconHeart, IconWave,
@@ -1006,6 +1007,7 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
   const [ajoutLoading, setAjoutLoading] = useState(null); 
   const [ajoutError, setAjoutError] = useState('');
   const [extractRow, setExtractRow] = useState(null);
+  const [extractEntitesRow, setExtractEntitesRow] = useState(null);
 
   async function ouvrirAjoutDocument(row) {
     setAjoutError('');
@@ -1199,7 +1201,36 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
                             }}
                           >
                             <IconRefresh size={13} />
-                            Extraire
+                            Extraire coordonnées
+                          </button>
+                          <button
+                            onClick={() => setExtractEntitesRow(r.pseudonyme)}
+                            disabled={r.coordonnees_en_attente > 0}
+                            title={r.coordonnees_en_attente > 0
+                              ? 'Validez d\'abord les coordonnées de ce patient'
+                              : 'Extraire les entités médicales (tables cliniques) de ce patient'}
+                            style={{
+                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                              borderRadius: 10,
+                              border: `1.5px solid ${extractEntitesRow === r.pseudonyme ? 'var(--teal)' : 'var(--line)'}`,
+                              background: extractEntitesRow === r.pseudonyme ? 'var(--teal-tint)' : 'var(--card)',
+                              color: r.coordonnees_en_attente > 0 ? 'var(--slate-soft)' : 'var(--teal-deep)',
+                              fontSize: 11.5, fontWeight: 600,
+                              opacity: r.coordonnees_en_attente > 0 ? 0.55 : 1,
+                              cursor: r.coordonnees_en_attente > 0 ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            <IconRefresh size={13} />
+                            Extraire entités
+                            {r.entites_en_attente > 0 && (
+                              <span style={{
+                                minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999,
+                                background: 'var(--error, #b3261e)', color: '#fff', fontSize: 9.5,
+                                fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {r.entites_en_attente}
+                              </span>
+                            )}
                           </button>
                         </div>
                       </td>
@@ -1215,6 +1246,13 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
             pseudonyme={extractRow}
             onClose={() => setExtractRow(null)}
             onAllDone={() => setExtractRow(null)}
+          />
+        )}
+        {extractEntitesRow && (
+          <ExtractionEntitesModal
+            pseudonyme={extractEntitesRow}
+            onClose={() => setExtractEntitesRow(null)}
+            onReviewed={() => setExtractEntitesRow(null)}
           />
         )}
         {ajoutError && (

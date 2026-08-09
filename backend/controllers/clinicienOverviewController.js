@@ -39,6 +39,7 @@ async function getClinicienOverview(req, res) {
       totals,
       sexeRepartition,
       fichesIdentite,
+      fichesEntites,
       inclusionsByMonth,
       statutSuiviSep,
       statutSuiviEpr,
@@ -91,6 +92,20 @@ async function getClinicienOverview(req, res) {
          AND d.texte_transcrit IS NOT NULL
          AND TRIM(d.texte_transcrit) <> ''
          AND d.coordonnees_extraites = false
+      `),
+
+      // Même logique que ci-dessus mais pour le pipeline d'entités médicales :
+      // uniquement les dossiers dont les coordonnées sont déjà validées.
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT p.pseudonyme) FILTER (WHERE d.id IS NOT NULL)::int AS patients_avec_entites_en_attente
+        FROM patients p
+        LEFT JOIN documents_bruts d
+          ON d.pseudonyme = p.pseudonyme
+         AND d.texte_transcrit IS NOT NULL
+         AND TRIM(d.texte_transcrit) <> ''
+         AND d.coordonnees_extraites = true
+         AND COALESCE(d.entites_extraites, false) = false
       `),
 
       pool.query(`
@@ -379,6 +394,7 @@ async function getClinicienOverview(req, res) {
       ageRepartition: ageRepartitionRows,
       ageEstimeApproximatif: false, 
       fichesIdentite: fichesIdentite.rows[0],
+      fichesEntites: fichesEntites.rows[0],
       inclusionsByMonth: inclusionsByMonth.rows,
       comparatifSuivi: {
         sep: statutSuiviSep.rows,

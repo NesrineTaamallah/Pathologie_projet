@@ -10,6 +10,16 @@ const SENSITIVE_FIELDS = [
   'frere', 'soeur', 'autre_antecedent',
 ];
 
+// Ces champs restent modifiables même s'ils existent déjà en base.
+// Tous les autres, une fois remplis, sont verrouillés : on garde la valeur en base
+// même si une extraction ultérieure propose autre chose.
+const CHAMPS_TOUJOURS_MODIFIABLES = [
+  'telephone', 'adresse', 'num_cnam', 'cin',
+  // Champs multi-valeurs : la fusion additive (dédoublonnée) est déjà calculée
+  // avant l'envoi ici, il faut donc toujours écrire la valeur reçue.
+  'frere', 'soeur', 'autre_antecedent',
+];
+
 
 async function listCoordonnees(req, res) {
   try {
@@ -107,7 +117,11 @@ async function createCoordonnee(req, res) {
     await pool.query(
       `INSERT INTO coordonnee_patient (${columns.join(', ')}) VALUES (${placeholders})
        ON CONFLICT (pseudonyme) DO UPDATE SET
-       ${SENSITIVE_FIELDS.map((f) => `${f} = EXCLUDED.${f}`).join(', ')}`,
+       ${SENSITIVE_FIELDS.map((f) =>
+          CHAMPS_TOUJOURS_MODIFIABLES.includes(f)
+            ? `${f} = EXCLUDED.${f}`
+            : `${f} = COALESCE(coordonnee_patient.${f}, EXCLUDED.${f})` // verrouillé une fois rempli
+        ).join(', ')}`,
       values
     );
 

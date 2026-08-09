@@ -270,6 +270,12 @@ export default function OverviewTabClinicien({ onAlerteClick }) {
           value={data.fichesIdentite.patients_avec_extraction_en_attente}
           onClick={data.fichesIdentite.patients_avec_extraction_en_attente > 0 ? () => onAlerteClick?.('identiteManquante') : undefined}
         />
+        <HeroStatCard
+          label="Patients avec entités médicales en attente d'extraction"
+          value={data.fichesEntites.patients_avec_entites_en_attente}
+          hint={data.fichesEntites.patients_avec_entites_en_attente > 0 ? "Coordonnées déjà validées, entités pas encore extraites" : undefined}
+          onClick={data.fichesEntites.patients_avec_entites_en_attente > 0 ? () => onAlerteClick?.('entitesNonExtraites') : undefined}
+        />
       </div>
 
       {/* =====================================================================

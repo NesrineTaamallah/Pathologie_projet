@@ -188,6 +188,22 @@ const REQUETES = {
      AND d.coordonnees_extraites = false
     ORDER BY p.pseudonyme
   `),
+
+  // Entités médicales : uniquement les dossiers dont les coordonnées sont déjà
+  // validées (coordonnees_extraites = true) et dont au moins un document
+  // transcrit n'est pas encore passé par le pipeline d'entités.
+  entitesNonExtraites: async () => pool.query(`
+    SELECT DISTINCT p.pseudonyme, p.registre, NULL::date AS derniere_info,
+           NULL::text AS statut
+    FROM patients p
+    JOIN documents_bruts d
+      ON d.pseudonyme = p.pseudonyme
+     AND d.texte_transcrit IS NOT NULL
+     AND TRIM(d.texte_transcrit) <> ''
+     AND d.coordonnees_extraites = true
+     AND COALESCE(d.entites_extraites, false) = false
+    ORDER BY p.pseudonyme
+  `),
 };
 
 const LABELS = {
@@ -198,6 +214,7 @@ const LABELS = {
   bilanMultidisciplinaireAbsent: 'EPR sans aucun bilan multidisciplinaire',
   transitionAdulte: 'Transition ado → adulte (16-18 ans)',
   identiteManquante: 'Fiches sans extraction des données',
+  entitesNonExtraites: 'Fiches sans extraction des entités médicales',
   activiteMaladieSep: 'SEP — évidence d\'activité de la maladie (NEDA-3)',
   pharmacoresistanceSansEvaluationEpr: 'EPR — pharmacorésistance ILAE sans bilan pré-chirurgical',
 };
