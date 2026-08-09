@@ -1,0 +1,78 @@
+======================================================================
+FLUX D'INCLUSION DES PATIENTS (style STROBE)
+======================================================================
+Patients dans le registre épilepsie                          : 213
+  (-) exclus : consanguinité non renseignée (NULL/'NA')      : 1
+  (-) exclus : aucune étiologie principale codée             : 9
+Patients inclus dans l'analyse (avant gestion des familles)  : 204
+
+[Anomalie de saisie signalée, non-excluante] patients avec >1 ligne 'etiologie_principale = TRUE' : 0 (dédoublonnés automatiquement par DISTINCT ON, voir requête SQL)
+
+======================================================================
+STRUCTURE FAMILIALE DÉTECTÉE (heuristique sur le pseudonyme)
+======================================================================
+Nombre de familles avec >1 patient inclus : 1
+Nombre de patients concernés (non indépendants) : 3
+
+N avant dédoublonnage familial : 204
+N après dédoublonnage familial (analyse principale) : 202
+
+======================================================================
+TABLEAU DE CONTINGENCE (analyse principale, 1 observation/famille)
+======================================================================
+groupe_etiologique       AR_confirmee  Autre_etiologie
+consanguinite_parentale                               
+Oui                               0.0              0.0
+Non                               0.0              0.0
+
+======================================================================
+EFFECTIFS THÉORIQUES ATTENDUS SOUS H0
+======================================================================
+groupe_etiologique       AR_confirmee  Autre_etiologie
+consanguinite_parentale                               
+Oui                               NaN              NaN
+Non                               NaN              NaN
+
+Condition Ei >= 5 respectée : False
+
+======================================================================
+RÉSULTAT DU TEST CHI² (correction de Yates)
+======================================================================
+Chi² = nan   ddl = 1   p-value = nan
+
+=> p >= 0.05 : pas d'association significative détectée.
+
+======================================================================
+Ei < 5 dans au moins une case -> test exact de Fisher recommandé
+======================================================================
+OR (Fisher) = nan   p-value (Fisher) = 1
+
+[!] OR non calculable (au moins une case du tableau de contingence est nulle).
+
+======================================================================
+ODDS RATIO (analyse principale, données dédoublonnées)
+======================================================================
+OR non calculable
+
+======================================================================
+CRAMÉR'S V
+======================================================================
+V = nan  (repère : ~0.1 faible / ~0.3 modérée / ~0.5+ forte)
+
+======================================================================
+ANALYSE DE SENSIBILITÉ : GEE (structure familiale, Exchangeable)
+======================================================================
+N (toutes observations, y compris jumeaux/fratrie) = 204
+OR (GEE, corrigé structure familiale) = 1.00   IC95% = [1.00 ; 1.00]
+p-value (GEE) = nan
+
+=> Comparaison : OR naïf (dédoublonné) = nan (p=nan)  vs  OR GEE (corrigé) = 1.00 (p=nan)
+   Conclusion cohérente entre les deux approches.
+
+======================================================================
+TEST DE TENDANCE DE COCHRAN-ARMITAGE (effet dose-réponse)
+======================================================================
+H0 : pas de tendance linéaire du % d'étiologie AR selon le degré de parenté
+Ordre croissant : Non (0) < 3e degré (1) < 2e degré (2) < 1er degré (3)
+(NB : 169 patients consanguins sans degré précisé, exclus du test de tendance)
+Test de tendance non calculable (effectifs insuffisants ou dégénérés).

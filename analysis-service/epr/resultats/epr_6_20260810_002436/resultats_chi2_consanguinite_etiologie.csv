@@ -1,0 +1,16 @@
+indicateur,valeur
+N_avant_dedoublonnage,204.0
+N_apres_dedoublonnage,3.0
+Chi2,
+ddl,1.0
+p_value_chi2,
+OR,
+IC95_bas,
+IC95_haut,
+Cramers_V,
+OR_Fisher,
+p_value_Fisher,1.0
+OR_GEE_corrige_famille,1.0
+IC95_bas_GEE,1.0
+IC95_haut_GEE,1.0
+p_value_GEE,

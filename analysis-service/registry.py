@@ -141,19 +141,11 @@ from epr.test5_genotype_phenotype import PARAMETRES_SCHEMA as EPR5_PARAMETRES_SC
 
 
 def run_epr6(engine, config):
-    # test6_epr.py ne lit pas les variables d'env PG_* : il expose une
-    # constante DB_CONFIG (dict) en dur, qu'on substitue avec les vraies
-    # valeurs de connexion.
-    overrides = {
-        "DB_CONFIG": {
-            "host": PG_ENV["PGHOST"],
-            "port": int(PG_ENV["PGPORT"]),
-            "dbname": PG_ENV["PGDATABASE"],
-            "user": PG_ENV["PGUSER"],
-            "password": PG_ENV["PGPASSWORD"],
-        },
-    }
-    return run_original_script(_epr("test6_epr.py"), overrides=overrides)
+    from epr.test6_consanguinite_etiologie import run as _run
+    return _run(engine, config)
+
+
+from epr.test6_consanguinite_etiologie import PARAMETRES_SCHEMA as EPR6_PARAMETRES_SCHEMA
 
 
 def run_epr7(engine, config):
