@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client';
-import { IconUsers, IconChart, IconWave, IconAlert } from '../components/Icons';
+import { IconUsers, IconChart, IconWave, IconAlert, IconRefresh } from '../components/Icons';
 import {
   GOUVERNORAT_PALETTE, normalizeKey, pctLabel, monthLabel, dayLabel,
   SectionHeading, CardTitle, HeroStatCard, DonutCard, StackedBar,
@@ -265,6 +265,10 @@ export default function OverviewTabClinicien({ onAlerteClick }) {
           segments={data.ageRepartition.map((a, i) => ({ label: a.tranche, value: a.count, color: GOUVERNORAT_PALETTE[i % GOUVERNORAT_PALETTE.length] }))}
           centerLabel="patients"
         />
+      </div>
+
+      <SectionHeading Icon={IconRefresh} title="Alertes extraction" subtitle="Documents et entités médicales pas encore extraits" />
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <HeroStatCard
           label="Patients avec document en attente d'extraction"
           value={data.fichesIdentite.patients_avec_extraction_en_attente}

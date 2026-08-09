@@ -15,6 +15,20 @@ import { IconRefresh, IconAlert, IconX, IconCheckCircle } from './Icons';
  *    "Valider" marque seulement le dossier comme "revu" (fait disparaître
  *    l'alerte dashboard) et permet d'exporter/copier le JSON corrigé.
  */
+const scrollbarStyleId = 'extraction-modal-scrollbar-style';
+if (typeof document !== 'undefined' && !document.getElementById(scrollbarStyleId)) {
+  const style = document.createElement('style');
+  style.id = scrollbarStyleId;
+  style.textContent = `
+    .extraction-modal-card { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+    .extraction-modal-card::-webkit-scrollbar { width: 9px; }
+    .extraction-modal-card::-webkit-scrollbar-track { background: transparent; }
+    .extraction-modal-card::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+    .extraction-modal-card::-webkit-scrollbar-thumb:hover { background: var(--slate-soft); }
+  `;
+  document.head.appendChild(style);
+}
+
 export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed }) {
   const [statut, setStatut] = useState('idle'); // idle | loading | done | error
   const [erreur, setErreur] = useState('');
@@ -82,12 +96,15 @@ export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed
       style={{
         position: 'fixed', inset: 0, background: 'rgba(18,42,48,.55)', backdropFilter: 'blur(2px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20,
-        overflowY: 'auto',
+        // NB : ce conteneur ne doit PAS avoir son propre overflow scrollable :
+        // avec deux ancêtres en overflowY:auto imbriqués, la molette/le drag
+        // sont parfois captés par celui-ci au lieu de la carte interne, et le
+        // bas de la carte (derniers champs / boutons) reste inaccessible.
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: 'var(--card)', borderRadius: 16, width: 820, maxWidth: '100%', maxHeight: '86vh',
-        overflowY: 'auto', padding: '22px 24px 24px', boxShadow: '0 20px 50px -10px rgba(18,42,48,.35)',
+      <div onClick={(e) => e.stopPropagation()} className="extraction-modal-card" style={{
+        background: 'var(--card)', borderRadius: 16, width: 820, maxWidth: '100%', maxHeight: 'calc(100vh - 40px)',
+        overflowY: 'auto', overscrollBehavior: 'contain', padding: '22px 24px 24px', boxShadow: '0 20px 50px -10px rgba(18,42,48,.35)',
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -182,22 +199,41 @@ export default function ExtractionEntitesModal({ pseudonyme, onClose, onReviewed
   );
 }
 
+function objetEntierementVide(obj) {
+  if (!obj || typeof obj !== 'object') return true;
+  return Object.entries(obj).every(([k, v]) => {
+    if (k.startsWith('evidence_span_') || k.startsWith('_')) return true;
+    return v === null || v === 'null';
+  });
+}
+
 function TableBloc({ tableKey, contenu, onChampObjet, onChampListe, onSupprimer }) {
   const estListe = Array.isArray(contenu);
+  const totalementVide = estListe
+    ? contenu.length === 0
+    : objetEntierementVide(contenu);
   return (
     <div style={{ borderRadius: 12, border: '1.5px solid var(--line)', background: 'var(--paper)', overflow: 'hidden' }}>
-      <div style={{ padding: '10px 14px', background: 'var(--card)', borderBottom: '1px solid var(--line)' }}>
+      <div style={{ padding: '10px 14px', background: 'var(--card)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)' }}>{tableKey}</span>
         {estListe && (
-          <span style={{ fontSize: 11, color: 'var(--slate-soft)', marginLeft: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--slate-soft)' }}>
             {contenu.length} occurrence{contenu.length > 1 ? 's' : ''}
+          </span>
+        )}
+        {totalementVide && (
+          <span style={{
+            fontSize: 10.5, fontWeight: 600, color: '#8a6d1a', background: '#fdf6e6',
+            border: '1px solid #f0c36d', borderRadius: 999, padding: '2px 8px', marginLeft: 'auto',
+          }}>
+            Rien détecté
           </span>
         )}
       </div>
       <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {estListe
           ? (contenu.length === 0
-              ? <p className="hint" style={{ margin: 0, fontSize: 12 }}>Aucune occurrence détectée.</p>
+              ? <p className="hint" style={{ margin: 0, fontSize: 12 }}>Aucune occurrence détectée — le clinicien peut en ajouter une manuellement si nécessaire.</p>
               : contenu.map((occurrence, idx) => (
                   <OccurrenceForm
                     key={idx}
@@ -217,17 +253,35 @@ function OccurrenceForm({ occurrence, onChange, onSupprimer }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8, borderBottom: onSupprimer ? '1px dashed var(--line)' : 'none' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        {champs.map((champ) => (
-          <div key={champ} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <label style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--slate)' }}>{champ}</label>
-            <input
-              value={occurrence[champ] === 'null' || occurrence[champ] == null ? '' : occurrence[champ]}
-              placeholder={occurrence[champ] === 'null' ? 'non mentionné' : occurrence[champ] === 'NA' ? 'NA' : '—'}
-              onChange={(e) => onChange(champ, e.target.value)}
-              style={{ padding: '6px 8px', borderRadius: 7, border: '1.5px solid var(--line)', fontSize: 11.5, background: '#fff' }}
-            />
-          </div>
-        ))}
+        {champs.map((champ) => {
+          const valeurBrute = occurrence[champ];
+          const estVide = valeurBrute === 'null' || valeurBrute == null;
+          const evidence = occurrence[`evidence_span_${champ}`];
+          const aEvidence = typeof evidence === 'string' && evidence.trim().length > 0;
+          return (
+            <div key={champ} style={{
+              display: 'flex', flexDirection: 'column', gap: 3, padding: 6, borderRadius: 8,
+              background: estVide ? '#fbfcfe' : '#fff', border: '1px solid var(--line)',
+            }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)' }}>{champ}</label>
+              <input
+                value={estVide ? '' : valeurBrute}
+                placeholder={valeurBrute === 'null' ? 'non mentionné dans le texte' : valeurBrute === 'NA' ? 'NA' : '—'}
+                onChange={(e) => onChange(champ, e.target.value)}
+                style={{ padding: '6px 8px', borderRadius: 7, border: '1.5px solid var(--line)', fontSize: 11.5, background: '#fff', color: 'var(--ink)' }}
+              />
+              {aEvidence ? (
+                <p style={{ margin: 0, fontSize: 10.5, color: 'var(--slate)', fontStyle: 'italic', lineHeight: 1.35 }}>
+                  « {evidence} »
+                </p>
+              ) : (
+                <p style={{ margin: 0, fontSize: 10.5, color: 'var(--slate-soft)' }}>
+                  Aucun passage du texte identifié pour ce champ — à vérifier manuellement.
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
       {onSupprimer && (
         <button type="button" onClick={onSupprimer}

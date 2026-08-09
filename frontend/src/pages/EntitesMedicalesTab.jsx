@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Fragment } from 'react';
+import { useEffect, useMemo, useState, useRef, Fragment } from 'react';
 import client from '../api/client';
 import useDragScroll from '../hooks/useDragScroll';
 import { SectionHeading } from '../components/DashboardWidgets';
@@ -10,7 +10,7 @@ import {
   IconEye, IconPlus, IconSearch, IconFolder, IconAlert,
   IconUsers, IconHistory, IconActivity, IconTarget, IconHeart, IconWave,
   IconArrowLeft, IconShield, IconGlobe, IconKey, IconRefresh, IconLock, IconEyeOff,
-  IconUpload, IconDownload,
+  IconUpload, IconDownload, IconDots,
 } from '../components/Icons';
 
 const REGISTRE_STYLE = {
@@ -1008,6 +1008,23 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
   const [ajoutError, setAjoutError] = useState('');
   const [extractRow, setExtractRow] = useState(null);
   const [extractEntitesRow, setExtractEntitesRow] = useState(null);
+  const [openMenuRow, setOpenMenuRow] = useState(null);
+  const tableRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutside(e) {
+      if (tableRef.current && !tableRef.current.contains(e.target)) setOpenMenuRow(null);
+    }
+    function handleEscape(e) {
+      if (e.key === 'Escape') setOpenMenuRow(null);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   async function ouvrirAjoutDocument(row) {
     setAjoutError('');
@@ -1139,7 +1156,7 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
 
         {!loading && filtered.length > 0 && (
           <div
-            ref={dossiersScrollRef}
+            ref={(el) => { dossiersScrollRef.current = el; tableRef.current = el; }}
             style={{ overflowX: 'auto', borderRadius: 10, cursor: 'grab' }}
           >
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.8 }}>
@@ -1163,75 +1180,83 @@ export default function EntitesMedicalesTab({ alertType, onConsumed }) {
                       <td style={{ padding: '11px 10px' }}>{fmtDate(r.derniere_visite)}</td>
                       <td style={{ padding: '11px 10px' }}><CompletudeCell value={r.completude} /></td>
                       <td style={{ padding: '11px 10px' }}>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button
                             onClick={() => setViewPseudo(r.pseudonyme)}
+                            title="Voir le dossier"
                             style={{
-                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                              borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--card)',
-                              color: 'var(--teal-deep)', fontSize: 11.5, fontWeight: 600,
+                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                              borderRadius: 9, border: '1.5px solid var(--teal)', background: 'var(--teal)',
+                              color: '#fff', fontSize: 11.5, fontWeight: 600,
                             }}
                           >
                             <IconEye size={13} />
                             Voir
                           </button>
-                          <button
-                            onClick={() => ouvrirAjoutDocument(r)}
-                            disabled={ajoutLoading === r.pseudonyme}
-                            title="Ajouter un document (audio/scan) à ce dossier existant"
-                            style={{
-                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                              borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--card)',
-                              color: 'var(--teal-deep)', fontSize: 11.5, fontWeight: 600,
-                              opacity: ajoutLoading === r.pseudonyme ? 0.6 : 1,
-                            }}
-                          >
-                            <IconPlus size={13} />
-                            {ajoutLoading === r.pseudonyme ? '…' : 'Ajouter'}
-                          </button>
-                          <button
-                            onClick={() => setExtractRow(r.pseudonyme)}
-                            title="Extraire les coordonnées de ce patient depuis les documents transcrits"
-                            style={{
-                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                              borderRadius: 10,
-                              border: `1.5px solid ${extractRow === r.pseudonyme ? 'var(--teal)' : 'var(--line)'}`,
-                              background: extractRow === r.pseudonyme ? 'var(--teal-tint)' : 'var(--card)',
-                              color: 'var(--teal-deep)', fontSize: 11.5, fontWeight: 600,
-                            }}
-                          >
-                            <IconRefresh size={13} />
-                            Extraire coordonnées
-                          </button>
-                          <button
-                            onClick={() => setExtractEntitesRow(r.pseudonyme)}
-                            disabled={r.coordonnees_en_attente > 0}
-                            title={r.coordonnees_en_attente > 0
-                              ? 'Validez d\'abord les coordonnées de ce patient'
-                              : 'Extraire les entités médicales (tables cliniques) de ce patient'}
-                            style={{
-                              width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                              borderRadius: 10,
-                              border: `1.5px solid ${extractEntitesRow === r.pseudonyme ? 'var(--teal)' : 'var(--line)'}`,
-                              background: extractEntitesRow === r.pseudonyme ? 'var(--teal-tint)' : 'var(--card)',
-                              color: r.coordonnees_en_attente > 0 ? 'var(--slate-soft)' : 'var(--teal-deep)',
-                              fontSize: 11.5, fontWeight: 600,
-                              opacity: r.coordonnees_en_attente > 0 ? 0.55 : 1,
-                              cursor: r.coordonnees_en_attente > 0 ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            <IconRefresh size={13} />
-                            Extraire entités
-                            {r.entites_en_attente > 0 && (
-                              <span style={{
-                                minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999,
-                                background: 'var(--error, #b3261e)', color: '#fff', fontSize: 9.5,
-                                fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              }}>
-                                {r.entites_en_attente}
-                              </span>
+
+                          <div className="actions-cell" style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className="kebab-btn"
+                              aria-haspopup="menu"
+                              aria-expanded={openMenuRow === r.pseudonyme}
+                              aria-label="Plus d'actions"
+                              onClick={() => setOpenMenuRow((cur) => (cur === r.pseudonyme ? null : r.pseudonyme))}
+                              style={{ position: 'relative' }}
+                            >
+                              <IconDots size={17} />
+                              {r.entites_en_attente > 0 && (
+                                <span style={{
+                                  position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: 999,
+                                  background: 'var(--error, #b3261e)', border: '1.5px solid var(--card)',
+                                }} />
+                              )}
+                            </button>
+                            {openMenuRow === r.pseudonyme && (
+                              <div className="actions-menu" role="menu" style={{ right: 0, left: 'auto' }}>
+                                <div className="actions-menu-group">
+                                  <button
+                                    type="button" className="actions-menu-item" role="menuitem"
+                                    disabled={ajoutLoading === r.pseudonyme}
+                                    title="Ajouter un document (audio/scan) à ce dossier existant"
+                                    onClick={() => { setOpenMenuRow(null); ouvrirAjoutDocument(r); }}
+                                  >
+                                    <IconPlus size={15} /> {ajoutLoading === r.pseudonyme ? 'Ajout…' : 'Ajouter un document'}
+                                  </button>
+                                </div>
+                                <div className="actions-menu-group">
+                                  <button
+                                    type="button" className="actions-menu-item" role="menuitem"
+                                    title="Extraire les coordonnées de ce patient depuis les documents transcrits"
+                                    onClick={() => { setOpenMenuRow(null); setExtractRow(r.pseudonyme); }}
+                                  >
+                                    <IconRefresh size={15} /> Extraire coordonnées
+                                  </button>
+                                  <button
+                                    type="button" className="actions-menu-item" role="menuitem"
+                                    disabled={r.coordonnees_en_attente > 0}
+                                    title={r.coordonnees_en_attente > 0
+                                      ? 'Validez d\'abord les coordonnées de ce patient'
+                                      : 'Extraire les entités médicales (tables cliniques) de ce patient'}
+                                    onClick={() => { setOpenMenuRow(null); setExtractEntitesRow(r.pseudonyme); }}
+                                  >
+                                    <IconRefresh size={15} />
+                                    Extraire entités
+                                    {r.entites_en_attente > 0 && (
+                                      <span style={{
+                                        minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999,
+                                        background: 'var(--error, #b3261e)', color: '#fff', fontSize: 9.5,
+                                        fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        marginLeft: 'auto',
+                                      }}>
+                                        {r.entites_en_attente}
+                                      </span>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
                             )}
-                          </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
