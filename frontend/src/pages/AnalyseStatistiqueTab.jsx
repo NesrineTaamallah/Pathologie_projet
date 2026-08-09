@@ -246,18 +246,53 @@ function ResultatErreur({ message, accent }) {
 
 
 
+// Pour les seuils laissés au choix du clinicien, `recommande` cite la valeur
+// (ou les valeurs) la mieux étayée par la littérature, pour guider un choix
+// éclairé plutôt qu'arbitraire. Sources : échelle EDSS de Kurtzke (jalons de
+// handicap moteur) et seuil diagnostique usuel de l'index IgG du LCR.
 const EXPLICATIONS_PARAMETRES = {
-  type_regression: "Choix du modèle : « linear » estime un score EDSS continu (ex : 3,5) ; « logistic » estime directement une probabilité de mauvais pronostic au-delà d'un seuil. Préférez « logistic » si vous cherchez surtout à identifier les patients à risque plutôt qu'une valeur précise.",
-  horizon_annees: "Moment, après le diagnostic, auquel le pronostic est évalué (ex : EDSS à 1 an). Un horizon court donne un résultat plus précis mais concerne moins de patients ayant un recul suffisant.",
-  tolerance_mois: "Marge acceptée autour de cet horizon pour rattacher une visite EDSS réelle. Une marge plus large inclut davantage de patients, au prix d'une mesure moins précise dans le temps — utile si l'échantillon est petit.",
-  seuil_logistique: "Score EDSS au-delà duquel un patient est considéré en mauvais pronostic (utilisé uniquement en régression logistique). À définir selon le seuil cliniquement pertinent pour votre pratique.",
-  mode_analyse: "« Univariée » : effet du facteur seul, à interpréter avec prudence (facteurs de confusion possibles). « Multivariée » : effet ajusté sur d'autres facteurs cliniques (covariables), résultat plus robuste mais exige davantage de patients.",
-  covariables: "Facteurs cliniques additionnels inclus en mode multivarié pour ajuster le résultat. Chaque covariable ajoutée dilue la puissance statistique : respectez la règle d'environ 5 à 10 patients par variable pour un résultat stable.",
-  seuil_bas_clinicien: "Score en dessous duquel un patient est classé « risque faible » (stratification selon l'appréciation clinique). Laisser vide pour un calcul automatique par terciles sur la cohorte de cette analyse.",
-  seuil_haut_clinicien: "Score à partir duquel un patient est classé « risque élevé » (stratification clinique). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
-  seuil_bas_objectif: "Score en dessous duquel un patient est classé « risque faible » (stratification selon une définition objective post-TAP, indépendante du jugement clinique). Laisser vide pour un calcul automatique par terciles.",
-  seuil_haut_objectif: "Score à partir duquel un patient est classé « risque élevé » (stratification objective post-TAP). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  type_regression: {
+    texte: "Choix du modèle : « linear » estime un score EDSS continu (ex : 3,5) ; « logistic » estime directement une probabilité de mauvais pronostic au-delà d'un seuil. Préférez « logistic » si vous cherchez surtout à identifier les patients à risque plutôt qu'une valeur précise.",
+  },
+  horizon_annees: {
+    texte: "Moment, après le diagnostic, auquel le pronostic est évalué (ex : EDSS à 1 an). Un horizon court donne un résultat plus précis mais concerne moins de patients ayant un recul suffisant.",
+  },
+  tolerance_mois: {
+    texte: "Marge acceptée autour de cet horizon pour rattacher une visite EDSS réelle. Une marge plus large inclut davantage de patients, au prix d'une mesure moins précise dans le temps — utile si l'échantillon est petit.",
+  },
+  seuil_logistique: {
+    texte: "Score EDSS au-delà duquel un patient est considéré en mauvais pronostic (utilisé uniquement en régression logistique).",
+    recommande: "3,0 / 4,0 / 6,0 — jalons de handicap validés dans la littérature sur l'EDSS (Kurtzke) : 4,0 marque une limitation significative des activités quotidiennes, 6,0 la nécessité d'une aide unilatérale à la marche. Ce sont les seuils les plus couramment retenus dans les études sur la SEP pédiatrique.",
+  },
+  mode_analyse: {
+    texte: "« Univariée » : effet du facteur seul, à interpréter avec prudence (facteurs de confusion possibles). « Multivariée » : effet ajusté sur d'autres facteurs cliniques (covariables), résultat plus robuste mais exige davantage de patients.",
+  },
+  covariables: {
+    texte: "Facteurs cliniques additionnels inclus en mode multivarié pour ajuster le résultat. Chaque covariable ajoutée dilue la puissance statistique : respectez la règle d'environ 5 à 10 patients par variable pour un résultat stable.",
+  },
+  igg_threshold: {
+    texte: "Valeur de l'index IgG du LCR au-delà de laquelle une synthèse intrathécale d'IgG est considérée présente.",
+    recommande: "0,7 — seuil diagnostique standard en population adulte, également le plus utilisé en pédiatrie (sensibilité ≈ 83 %, spécificité ≈ 71 % dans les cohortes pédiatriques). Sa validation chez l'enfant reste toutefois limitée : à interpréter avec prudence si le contexte clinique est atypique.",
+  },
+  seuil_bas_clinicien: {
+    texte: "Score en dessous duquel un patient est classé « risque faible » (stratification selon l'appréciation clinique). Laisser vide pour un calcul automatique par terciles sur la cohorte de cette analyse.",
+  },
+  seuil_haut_clinicien: {
+    texte: "Score à partir duquel un patient est classé « risque élevé » (stratification clinique). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  },
+  seuil_bas_objectif: {
+    texte: "Score en dessous duquel un patient est classé « risque faible » (stratification selon une définition objective post-TAP, indépendante du jugement clinique). Laisser vide pour un calcul automatique par terciles.",
+  },
+  seuil_haut_objectif: {
+    texte: "Score à partir duquel un patient est classé « risque élevé » (stratification objective post-TAP). Doit être strictement supérieur au seuil bas. Laisser vide pour un calcul automatique.",
+  },
 };
+
+function explicationParametre(nomChamp) {
+  return EXPLICATIONS_PARAMETRES[nomChamp] || {
+    texte: "Paramètre du modèle statistique — ajuste le calcul selon la valeur choisie.",
+  };
+}
 
 function AideTest({ titre, description, parametresSchema, accent }) {
   const [ouvert, setOuvert] = useState(false);
@@ -282,29 +317,61 @@ function AideTest({ titre, description, parametresSchema, accent }) {
           <div onClick={() => setOuvert(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
           <div style={{
             position: 'absolute', top: 28, left: 0, zIndex: 21, width: 340,
+            height: 380, maxHeight: '70vh',
             background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12,
-            boxShadow: '0 12px 28px -12px rgba(17, 24, 39, 0.28)', padding: '14px 16px',
-            display: 'flex', flexDirection: 'column', gap: 10,
+            boxShadow: '0 12px 28px -12px rgba(17, 24, 39, 0.28)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
-            <div>
+            {/* En-tête fixe : ne défile pas avec le contenu */}
+            <div style={{ padding: '14px 16px 10px', flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
               <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--ink)' }}>{titre}</div>
               {description && <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--slate)' }}>{description}</p>}
             </div>
-            {parametresSchema && Object.keys(parametresSchema).length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: 'var(--slate-soft)' }}>
-                  Comment régler les paramètres
-                </div>
-                {Object.entries(parametresSchema).map(([nomChamp, schema]) => (
-                  <div key={nomChamp}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate-soft)' }}>{schema.label || nomChamp}</div>
-                    <p style={{ margin: '2px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--slate)' }}>
-                      {EXPLICATIONS_PARAMETRES[nomChamp] || "Paramètre du modèle statistique — ajuste le calcul selon la valeur choisie."}
-                    </p>
+
+            {/* Corps défilant : taille de la fenêtre fixe, contenu glissant */}
+            <div style={{
+              flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
+              padding: '10px 16px 14px',
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              {parametresSchema && Object.keys(parametresSchema).length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{
+                    position: 'sticky', top: -1, background: 'var(--card)', paddingBottom: 2, zIndex: 1,
+                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, color: 'var(--slate-soft)',
+                  }}>
+                    Comment régler les paramètres
                   </div>
-                ))}
-              </div>
-            )}
+                  {Object.entries(parametresSchema).map(([nomChamp, schema]) => {
+                    const { texte, recommande } = explicationParametre(nomChamp);
+                    return (
+                      <div key={nomChamp}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate-soft)' }}>{schema.label || nomChamp}</div>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--slate)' }}>{texte}</p>
+                        {recommande && (
+                          <div style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 5,
+                            background: 'var(--primary-tint)', borderRadius: 8, padding: '6px 9px',
+                          }}>
+                            <span style={{
+                              flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+                              color: 'var(--primary-deep)',
+                            }}>
+                              Recommandé
+                            </span>
+                            <span style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--primary-deep)' }}>{recommande}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-soft)', fontStyle: 'italic' }}>
+                  Ce test ne comporte aucun paramètre réglable.
+                </p>
+              )}
+            </div>
           </div>
         </>
       )}
