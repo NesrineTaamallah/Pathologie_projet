@@ -4,10 +4,6 @@ import threading
 
 from llama_cpp import Llama
 
-
-print(f"### FICHIER CHARGE DEPUIS : {__file__}", flush=True)
-
-
 MODEL_PATH = r"C:\hf-cache\qwen3-8b-gguf\Qwen3-8B-Q4_K_M.gguf"
 
 CHAMPS = [
@@ -51,12 +47,17 @@ def _charger_modele():
             _extractor_tokenizer = None  # non utilisé avec llama.cpp (chat template intégré)
             _extractor_model = model
         except Exception as exc:
-
             _model_load_error = str(exc)
             raise
 
 
 def _extraire_json(texte_genere: str) -> dict:
+    # Qwen3 génère un bloc <think>...</think> de raisonnement avant sa réponse.
+    # On ignore tout ce qui précède la fin du raisonnement, comme dans le
+    # notebook de référence (split sur le token de fin de thinking).
+    if "</think>" in texte_genere:
+        texte_genere = texte_genere.split("</think>", 1)[1]
+
     match = re.search(r"\{.*\}", texte_genere, re.DOTALL)
     if not match:
         raise ValueError("Aucun JSON trouvé dans la sortie du modèle.")
@@ -78,7 +79,7 @@ def extraire_donnees_patient(texte: str, chunking: bool = True, verbose: bool = 
 
     sortie = _extractor_model.create_chat_completion(
         messages=messages,
-        max_tokens=512,
+        max_tokens=2048,
         temperature=0,
     )
 
