@@ -21,7 +21,9 @@ from collections import Counter
 
 import yaml
 import requests
+import difflib
 from rapidfuzz import fuzz as rf_fuzz
+HAVE_RAPIDFUZZ = True
 from jinja2 import Environment
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -52,6 +54,8 @@ RECENCE_FRACTION = 1 / 3
 RECENCE_MIN_CHUNKS = 2
 VERIFICATION_TABLES_EPR = {"epr_eeg", "epr_imagerie", "epr_frequence_crises", "epr_type_crise", "epr_genetique"}
 VERIFICATION_TABLES_SEP = set()
+GREEDY_SAMPLER = "greedy"
+REPEATED_SAMPLER = "multinomial"
 
 # ## 2. Config — schémas d'extraction (SEP : 11 tables, EPR : 18 tables)
 # 
@@ -2589,10 +2593,6 @@ def extraire_un_dossier(chunks_dossier, tables_config, registre_label):
             if issues:
                 erreurs.append({"table": table_name, "issues": issues})
 
-        except torch.cuda.OutOfMemoryError:
-            gc.collect(); torch.cuda.empty_cache()
-            erreurs.append({"table": table_name, "issues": ["OOM - reessayer avec max_tokens plus bas"]})
-            resultats[table_name] = [] if table_cfg["repetee"] else None
         except Exception as exc:
             erreurs.append({"table": table_name, "issues": [f"exception: {exc}"]})
             resultats[table_name] = [] if table_cfg["repetee"] else None
@@ -2630,7 +2630,13 @@ def extract_entites(req: ExtractionRequest):
     if not req.chunks:
         raise HTTPException(422, "Aucun chunk de texte fourni.")
 
-    chunks_dossier = [{"texte": c.texte, "date": c.date} for c in req.chunks]
+    chunks_dossier = [
+        {"text": c.texte, "date": c.date, "idx": i}
+        for i, c in enumerate(req.chunks)
+        if c.texte and c.texte.strip()
+    ]
+    if not chunks_dossier:
+        raise HTTPException(422, "Aucun chunk de texte non vide fourni.")
     tables_config = TABLES_SEP if req.registre == "SEP" else TABLES_EPR
 
     try:
