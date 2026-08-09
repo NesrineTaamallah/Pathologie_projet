@@ -1,25 +1,4 @@
-"""
-Exécuteur générique de scripts d'analyse — ZÉRO modification des fichiers
-originaux dans test_analyse_statistique/SEP/ et /EPR/.
 
-Principe (aucune écriture sur disque, jamais) :
-  1. On LIT le code source du script original en mémoire (open().read()).
-  2. On y substitue, uniquement dans cette chaîne en mémoire, les lignes
-     de configuration de la forme "NOM_CONSTANTE = ..." repérées en tête
-     de fichier (ex: CONFIG = {...}, DB_URI = "...", ANALYSIS_MODE = "...")
-     par la valeur choisie par le clinicien dans le formulaire. Le fichier
-     .py sur le disque n'est jamais rouvert en écriture.
-  3. On exécute cette chaîne modifiée (compile + exec) dans un namespace
-     isolé, avec `input()` redirigé vers une file de réponses pré-remplies
-     (pour les quelques scripts qui posent des questions en console),
-     `plt.show()` neutralisé (backend Agg) et stdout capturé.
-  4. On récupère les figures (.png) écrites dans le dossier de sortie et
-     les notes/logs imprimés, pour les renvoyer en JSON au frontend.
-
-C'est l'équivalent programmatique de "lancer le script dans un terminal
-et répondre aux questions à sa place" — le fichier reste identique à
-celui que vous et votre camarade avez écrit et validé.
-"""
 import contextlib
 import io
 import os
@@ -49,17 +28,7 @@ def _input_depuis_file(reponses: list[str]):
 
 
 def _substituer_constantes(source: str, overrides: dict) -> str:
-    """Remplace, dans le TEXTE en mémoire uniquement, les affectations
-    'NOM = <valeur littérale>' en tête de script par la valeur choisie.
-    N'écrit jamais sur le fichier d'origine.
-
-    Utilise ast (et non une regex ligne par ligne) pour repérer les bornes
-    exactes de l'affectation : une simple regex '^NOM\\s*=.*$' ne capture
-    qu'UNE seule ligne, ce qui casse les constantes écrites sur plusieurs
-    lignes (ex: SELECTED_COVARIATES = [\n    ...,\n]) en laissant les
-    lignes restantes (et un ']' ou '}' orphelin) derrière — c'est la
-    cause du "SyntaxError: unmatched ']'" observé sur test1_epr.py.
-    """
+    
     for nom, valeur in overrides.items():
         arbre = ast.parse(source)
         cible = next(

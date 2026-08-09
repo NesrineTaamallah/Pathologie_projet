@@ -267,6 +267,14 @@ export default function OverviewTabClinicien({ onAlerteClick }) {
         />
       </div>
 
+      <div className="card">
+        <CardTitle>Inclusions mensuelles (12 derniers mois)</CardTitle>
+        <div style={{ marginTop: 14 }}>
+          <InclusionsLineChart months={data.inclusionsByMonth} />
+        </div>
+      </div>
+
+
       <SectionHeading Icon={IconRefresh} title="Alertes extraction" subtitle="Documents et entités médicales pas encore extraits" />
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <HeroStatCard
@@ -288,7 +296,7 @@ export default function OverviewTabClinicien({ onAlerteClick }) {
              après les chiffres clés — avant les graphiques et comparatifs).
       ===================================================================== */}
       <SectionHeading Icon={IconAlert} title="Alertes de suivi" subtitle="Cliquez une carte pour voir la liste des patients concernés " />
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
         <HeroStatCard
           label="Suivi actif mais point de suivi > 6 mois"
           value={data.alertes.suiviEnRetard}
@@ -372,13 +380,6 @@ export default function OverviewTabClinicien({ onAlerteClick }) {
           value={pctLabel(data.suiviQualite?.epr?.aJour, data.suiviQualite?.epr?.total)}
           hint={`${data.suiviQualite?.epr?.total ?? 0} patient(s) en suivi actif sur ${t.total_epr} au total dans le registre EPR (hors perdus de vue / décédés).`}
         />
-      </div>
-
-      <div className="card">
-        <CardTitle>Inclusions mensuelles (12 derniers mois)</CardTitle>
-        <div style={{ marginTop: 14 }}>
-          <InclusionsLineChart months={data.inclusionsByMonth} />
-        </div>
       </div>
 
       {/* =====================================================================

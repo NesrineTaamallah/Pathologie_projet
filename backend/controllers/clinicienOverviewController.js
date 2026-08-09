@@ -13,6 +13,11 @@ function parseDateNaissance(raw) {
   return null;
 }
 
+
+function todayTunisISO() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tunis' }).format(new Date());
+}
+
 function ageEnAnnees(dateNaissance, reference = new Date()) {
   let age = reference.getUTCFullYear() - dateNaissance.getUTCFullYear();
   const moisJourDepasses =
@@ -59,7 +64,7 @@ async function getClinicienOverview(req, res) {
           COUNT(*)::int AS total_patients,
           COUNT(*) FILTER (WHERE registre = 'SEP')::int AS total_sep,
           COUNT(*) FILTER (WHERE registre = 'EPR')::int AS total_epr,
-          COUNT(*) FILTER (WHERE date_inclusion >= date_trunc('month', now()))::int AS inclusions_ce_mois
+          COUNT(*) FILTER (WHERE date_inclusion >= date_trunc('month', now() AT TIME ZONE 'Africa/Tunis'))::int AS inclusions_ce_mois
         FROM patients
       `),
 
@@ -94,8 +99,7 @@ async function getClinicienOverview(req, res) {
          AND d.coordonnees_extraites = false
       `),
 
-      // Même logique que ci-dessus mais pour le pipeline d'entités médicales :
-      // uniquement les dossiers dont les coordonnées sont déjà validées.
+      
       pool.query(`
         SELECT
           COUNT(DISTINCT p.pseudonyme) FILTER (WHERE d.id IS NOT NULL)::int AS patients_avec_entites_en_attente
@@ -296,12 +300,12 @@ async function getClinicienOverview(req, res) {
            COUNT(*) FILTER (WHERE al.action = 'dossier_view')::int AS dossiers_consultes,
            COUNT(*) FILTER (WHERE al.action = 'dossier_document_creer')::int AS documents_televerses
          FROM generate_series(
-           (now() - interval '6 days')::date,
-           now()::date,
+           $2::date - interval '6 days',
+           $2::date,
            interval '1 day'
          ) d
          LEFT JOIN access_logs al
-           ON al.created_at::date = d
+           ON (al.created_at AT TIME ZONE 'Africa/Tunis')::date = d::date
            AND al.user_id = $1
            AND (
              al.action LIKE 'coordonnee_patient_reveal%'
@@ -313,7 +317,7 @@ async function getClinicienOverview(req, res) {
            )
          GROUP BY d
          ORDER BY d`,
-        [req.user.sub]
+        [req.user.sub, todayTunisISO()]
       ),
 
       
