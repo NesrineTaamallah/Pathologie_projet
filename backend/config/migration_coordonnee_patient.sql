@@ -39,3 +39,10 @@ DROP TRIGGER IF EXISTS trg_coordonnee_patient_updated_at ON coordonnee_patient;
 CREATE TRIGGER trg_coordonnee_patient_updated_at
   BEFORE UPDATE ON coordonnee_patient
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+  -- Retire les contraintes NOT NULL sur numero_dossier et nom_prenom :
+-- ces champs sont parfois absents du texte source (OCR/ASR) et le
+-- dossier doit pouvoir être enregistré quand même, à compléter plus tard.
+
+ALTER TABLE coordonnee_patient ALTER COLUMN numero_dossier DROP NOT NULL;
+ALTER TABLE coordonnee_patient ALTER COLUMN nom_prenom DROP NOT NULL;
