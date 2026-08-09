@@ -77,6 +77,14 @@ def run_sep6(engine, config):
 from sep.test6_consanguinite import PARAMETRES_SCHEMA as SEP6_PARAMETRES_SCHEMA
 
 
+def run_sep7(engine, config):
+    from sep.test7_lignes_therapeutiques import run as _run
+    return _run(engine, config)
+
+
+from sep.test7_lignes_therapeutiques import PARAMETRES_SCHEMA as SEP7_PARAMETRES_SCHEMA
+
+
 def run_sep8(engine, config):
     from sep.test8_severite_prediction import run as _run
     return _run(engine, config)
@@ -139,6 +147,9 @@ ANALYSES = {
     "sep_6": {"registre": "SEP", "titre": "Consanguinité, sexe et forme évolutive",
               "description": "Tests chi²/Fisher sur antécédents et présentation clinique.",
               "parametres_schema": SEP6_PARAMETRES_SCHEMA, "run": run_sep6},
+    "sep_7": {"registre": "SEP", "titre": "Lignes thérapeutiques et efficacité",
+              "description": "TAP, activité IRM et délai avant échec par groupe d'efficacité (GEE, Cox, appariement PS).",
+              "parametres_schema": SEP7_PARAMETRES_SCHEMA, "run": run_sep7},
     "sep_8": {"registre": "SEP", "titre": "Prédiction de sévérité (modèle validé, VIF, bootstrap)",
               "description": "Modèle de sévérité SEP avec validation croisée et calibration.",
               "parametres_schema": SEP8_PARAMETRES_SCHEMA, "run": run_sep8},

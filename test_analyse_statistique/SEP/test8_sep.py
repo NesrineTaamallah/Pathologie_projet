@@ -48,6 +48,8 @@ MODALITES_SEVERITE_POSITIVES = [
     "Hautement active", "hautement active",
     "Agressive", "agressive",
     "Hautement active / agressive", "hautement active / agressive",
+    # Convention reelle du dictionnaire de donnees (snake_case) :
+    "hautement_active", "hautement_active_agressive",
 ]
 
 N_FOLDS = 5
@@ -310,9 +312,21 @@ def prepare_data(
     n_avant = len(df)
 
     for col in df.columns:
+        if col == "severite":
+            continue  # traite plus bas : 'NA' texte a une semantique specifique pour ce champ
         if df[col].dtype == object:
             df[col] = df[col].replace({"NA": np.nan, "N/A": np.nan, "": np.nan})
 
+    # Convention documentee (schema_registre.sql, commentaire de la colonne :
+    # "severite VARCHAR(50) -- Hautement active / agressive") : ce champ ne
+    # sert qu'a flaguer le sous-groupe hautement actif/agressif. La valeur
+    # texte 'NA' est saisie explicitement pour signifier "critere non rempli"
+    # (evenement NEGATIF determine), et non "non evalue". Seul un NULL reel
+    # (non renseigne en base) est traite comme donnee manquante. Traiter 'NA'
+    # comme manquant ici exclurait a tort ~73% des patients (cf. seed :
+    # 146/200 patients severite='NA', repartis proportionnellement sur
+    # toutes les formes evolutives -- signe d'une valeur determinee, pas
+    # d'une saisie incomplete concentree sur un sous-groupe).
     df["y_clinicien"] = np.where(
         df["severite"].isna(), np.nan,
         df["severite"].isin(MODALITES_SEVERITE_POSITIVES).astype(float)
@@ -321,16 +335,25 @@ def prepare_data(
     df["y_objectif"] = compute_y_objectif(df, tap_window_months)
 
     
-    valeurs_valides = {"Oui", "Non"}
+    # localisation_moelle est une colonne BOOLEAN en base (TRUE/FALSE), pas
+    # une chaine "Oui"/"Non". On accepte les deux representations pour rester
+    # robuste si la colonne est un jour convertie en VARCHAR, mais le cas
+    # reel (booleen psycopg2 -> True/False Python) est desormais gere.
+    mapping_atteinte_medullaire = {
+        True: 1, False: 0,
+        "Oui": 1, "Non": 0,
+        "TRUE": 1, "FALSE": 0, "true": 1, "false": 0,
+    }
+    valeurs_valides = set(mapping_atteinte_medullaire.keys())
     masque_inattendu = ~df["localisation_moelle"].isin(valeurs_valides) & df["localisation_moelle"].notna()
     valeurs_inconnues = df.loc[masque_inattendu, "localisation_moelle"].unique()
     if len(valeurs_inconnues) > 0:
         logger.warning(
             f"[atteinte_medullaire] localisation_moelle contient {masque_inattendu.sum()} valeur(s) "
-            f"inattendue(s) (ni 'Oui' ni 'Non') : {list(valeurs_inconnues)} -> "
+            f"inattendue(s) (ni booleen ni 'Oui'/'Non') : {list(valeurs_inconnues)} -> "
             f"ces patients seront exclus par le filtrage en cas complets ci-dessous."
         )
-    df["atteinte_medullaire"] = df["localisation_moelle"].map({"Oui": 1, "Non": 0})
+    df["atteinte_medullaire"] = df["localisation_moelle"].map(mapping_atteinte_medullaire)
     predictors = list(PREDICTEURS_CAHIER_DES_CHARGES)
 
     cols_requises = predictors + ["y_clinicien", "y_objectif"]
@@ -604,6 +627,22 @@ def bootstrap_auc_ci(y_true: np.ndarray, y_proba: np.ndarray, n_bootstrap: int =
     mask = ~np.isnan(y_proba)
     y_true, y_proba = np.asarray(y_true)[mask], np.asarray(y_proba)[mask]
     n = len(y_true)
+    if n == 0:
+        raise ValueError(
+            "Effectif insuffisant pour ce modele : aucune probabilite hors-echantillon "
+            "(validation croisee) n'a pu etre calculee -- la classe minoritaire (patients "
+            "avec evenement positif) est trop petite pour former les plis de validation "
+            "croisee (voir le journal d'execution, section [CV]). Completez la severite "
+            "declaree ou l'evenement objectif pour davantage de patients, ou elargissez "
+            "la fenetre TAP precoce."
+        )
+    if len(np.unique(y_true)) < 2:
+        raise ValueError(
+            "Effectif insuffisant pour ce modele : les probabilites hors-echantillon "
+            "valides ne couvrent qu'une seule classe d'evenement -- l'AUC n'est pas "
+            "definissable. Completez les donnees ou elargissez la fenetre TAP precoce "
+            "pour obtenir des evenements positifs et negatifs en nombre suffisant."
+        )
     point = roc_auc_score(y_true, y_proba)
     rng = np.random.RandomState(RANDOM_STATE)
 

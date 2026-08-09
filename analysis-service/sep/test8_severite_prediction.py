@@ -19,23 +19,13 @@ PARAMETRES_SCHEMA = {
         "type": "number", "default": 12,
         "label": "Fenêtre TAP précoce (mois après le diagnostic)",
     },
-    "seuil_bas_clinicien": {
-        "type": "number", "default": None, "required": False,
-        "label": "Score — seuil « risque faible / intermédiaire » (Y clinicien, laisser vide = auto)",
-    },
-    "seuil_haut_clinicien": {
-        "type": "number", "default": None, "required": False,
-        "label": "Score — seuil « risque intermédiaire / élevé » (Y clinicien, laisser vide = auto)",
-    },
-    "seuil_bas_objectif": {
-        "type": "number", "default": None, "required": False,
-        "label": "Score — seuil « risque faible / intermédiaire » (Y objectif, laisser vide = auto)",
-    },
-    "seuil_haut_objectif": {
-        "type": "number", "default": None, "required": False,
-        "label": "Score — seuil « risque intermédiaire / élevé » (Y objectif, laisser vide = auto)",
-    },
 }
+# Les seuils clinicien/objectif (seuil_bas_clinicien, seuil_haut_clinicien,
+# seuil_bas_objectif, seuil_haut_objectif) restent gérés par `run()` via
+# `_seuil()`, qui retourne None quand la clé est absente de `config` --
+# le calcul automatique par terciles s'applique donc toujours. On les a
+# simplement retirés du formulaire affiché pour ne garder que la variable
+# demandée (fenêtre TAP précoce).
 
 
 def _charger_module_original(dossier_sortie: str):
