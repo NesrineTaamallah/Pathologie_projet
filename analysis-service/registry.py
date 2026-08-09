@@ -101,17 +101,19 @@ def _db_uri():
 
 
 def run_epr1(engine, config):
-    overrides = {
-        "DB_URI": _db_uri(),
-        "ANALYSIS_MODE": config.get("mode_analyse", "univariate"),
-        "AGE_VARIABLE_MODE": config.get("mode_age", "categorical"),
-        "SELECTED_COVARIATES": config.get("covariables", []),
-    }
-    return run_original_script(_epr("test1_epr.py"), overrides=overrides)
+    from epr.test1_etiologie_survie import run as _run
+    return _run(engine, config)
+
+
+from epr.test1_etiologie_survie import PARAMETRES_SCHEMA as EPR1_PARAMETRES_SCHEMA
 
 
 def run_epr2(engine, config):
-    return run_original_script(_epr("test2_epr.py"), env_overrides=PG_ENV)
+    from epr.test2_etiologie_regression import run as _run
+    return _run(engine, config)
+
+
+from epr.test2_etiologie_regression import PARAMETRES_SCHEMA as EPR2_PARAMETRES_SCHEMA
 
 
 def run_epr3(engine, config):
@@ -179,17 +181,10 @@ ANALYSES = {
 
     "epr_1": {"registre": "EPR", "titre": "Étiologie/pharmacorésistance — survie",
               "description": "Kaplan-Meier / Cox, univarié ou multivarié.",
-              "parametres_schema": {
-                  "mode_analyse": {"type": "select", "options": ["univariate", "multivariate"], "label": "Mode"},
-                  "covariables": {"type": "multiselect", "options": [
-                      "etiologie_structurelle", "crises_types_multiples", "freq_crises_baseline_mois",
-                      "irm_anormale", "eeg_anormal", "atcd_perinataux",
-                      "developpement_psychomoteur_avant_crises", "presence_regression",
-                  ], "label": "Covariables"},
-              }, "run": run_epr1},
+              "parametres_schema": EPR1_PARAMETRES_SCHEMA, "run": run_epr1},
     "epr_2": {"registre": "EPR", "titre": "Étiologie et pharmacorésistance (régression)",
               "description": "Régression logistique étiologie -> pharmacorésistance.",
-              "parametres_schema": {}, "run": run_epr2},
+              "parametres_schema": EPR2_PARAMETRES_SCHEMA, "run": run_epr2},
     "epr_3": {"registre": "EPR", "titre": "Type de crise ILAE 2017 et nombre d'AE essayés",
               "description": "ANOVA / comparaisons post-hoc (Tukey HSD).",
               "parametres_schema": {}, "run": run_epr3},

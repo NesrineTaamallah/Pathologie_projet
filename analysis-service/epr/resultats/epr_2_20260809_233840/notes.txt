@@ -1,0 +1,88 @@
+[OK] Contrainte d'intégrité vérifiée : 1 étiologie principale / patient.
+======================================================================
+CONTRÔLE QUALITÉ DES DONNÉES
+======================================================================
+Nombre de patients extraits : 204
+[OK] Aucun doublon de pseudonyme.
+
+Données manquantes par colonne (NULL réel + 'NA' littéral convertis) :
+  - age_diagnostic_pharmacoresistance_mois         104 manquants (51.0%)
+
+Patients exclus (étiologie ou statut manquant) : 0
+Effectif final analysable (Chi²) : 204
+
+Répartition par catégorie étiologique :
+categorie_etiologique
+Inconnue        68
+Structurelle    55
+Genetique       49
+Metabolique     15
+Infectieuse      9
+Immune           8
+
+Répartition par statut de pharmacorésistance :
+statut_pharmacoresistance
+False    104
+True     100
+
+======================================================================
+ÉTAPE 1 — TEST DU CHI² D'INDÉPENDANCE
+======================================================================
+
+Tableau de contingence (effectifs observés) :
+statut_pharmacoresistance  False  True 
+categorie_etiologique                  
+Genetique                     27     22
+Immune                         2      6
+Inconnue                      37     31
+Infectieuse                    4      5
+Metabolique                    8      7
+Structurelle                  26     29
+
+Chi² = 3.304, ddl = 5, p-value = 0.6532
+[ATTENTION] 4 cellule(s) avec effectif théorique < 5 -> envisager le test exact de Fisher ou un regroupement de catégories.
+V de Cramér (taille d'effet) = 0.127
+
+=> Association significative au seuil de 2.05 entre étiologie ILAE et statut de pharmacorésistance.
+
+======================================================================
+ÉTAPE 2 — RÉGRESSION LOGISTIQUE (catégorie étiologique, réf. = Structurelle)
+======================================================================
+Formule du modèle : y ~ C(categorie_etiologique, Treatment(reference='Structurelle')) + age_debut_crises_mois + frequence_normalisee_mois + C(developpement_psychomoteur_avant_crises)
+Covariables d'ajustement retenues : ['age_debut_crises_mois', 'frequence_normalisee_mois', 'developpement_psychomoteur_avant_crises']
+Effectif utilisé dans le modèle : 204 / 204
+                           Logit Regression Results                           
+==============================================================================
+Dep. Variable:                      y   No. Observations:                  204
+Model:                          Logit   Df Residuals:                      195
+Method:                           MLE   Df Model:                            8
+Date:                Sun, 09 Aug 2026   Pseudo R-squ.:                 0.02775
+Time:                        23:38:39   Log-Likelihood:                -137.44
+converged:                       True   LL-Null:                       -141.36
+Covariance Type:            nonrobust   LLR p-value:                    0.4487
+================================================================================================================================================
+                                                                                   coef    std err          z      P>|z|      [0.025      0.975]
+------------------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                        0.3716      0.419      0.888      0.375      -0.449       1.192
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Genetique]      -0.3601      0.400     -0.899      0.368      -1.145       0.424
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Immune]          0.8559      0.872      0.981      0.326      -0.853       2.565
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Inconnue]       -0.3231      0.370     -0.874      0.382      -1.047       0.401
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Infectieuse]     0.0390      0.729      0.053      0.957      -1.391       1.469
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Metabolique]    -0.3693      0.598     -0.617      0.537      -1.542       0.804
+C(developpement_psychomoteur_avant_crises)[T.Retard]                             0.1498      0.321      0.466      0.641      -0.480       0.780
+age_debut_crises_mois                                                           -0.0047      0.003     -1.614      0.107      -0.010       0.001
+frequence_normalisee_mois                                                        0.0096      0.009      1.031      0.302      -0.009       0.028
+================================================================================================================================================
+
+Tableau des Odds Ratios (référence = Structurelle) :
+                                                                              coefficient     OR  IC95_bas  IC95_haut  p_value  significatif
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Genetique]         -0.360  0.698     0.318      1.529    0.368          True
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Immune]             0.856  2.353     0.426     13.002    0.326          True
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Inconnue]          -0.323  0.724     0.351      1.494    0.382          True
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Infectieuse]        0.039  1.040     0.249      4.344    0.957          True
+C(categorie_etiologique, Treatment(reference='Structurelle'))[T.Metabolique]       -0.369  0.691     0.214      2.234    0.537          True
+C(developpement_psychomoteur_avant_crises)[T.Retard]                                0.150  1.162     0.619      2.181    0.641          True
+age_debut_crises_mois                                                              -0.005  0.995     0.990      1.001    0.107          True
+frequence_normalisee_mois                                                           0.010  1.010     0.991      1.028    0.302          True
+
+Pseudo-R² de McFadden = 0.028

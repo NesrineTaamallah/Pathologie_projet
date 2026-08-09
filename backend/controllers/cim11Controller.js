@@ -12,6 +12,7 @@ const pool = require('../config/db');
  *  - correspondance directe par code (ex: "8A61")
  */
 async function rechercherCim11(req, res) {
+  const client = await pool.connect();
   try {
     const q = (req.query.q || '').trim();
     const limit = Math.min(parseInt(req.query.limit, 10) || 15, 50);
@@ -20,30 +21,40 @@ async function rechercherCim11(req, res) {
       return res.json({ resultats: [] });
     }
 
-    // Recherche directe par code (insensible à la casse)
     const codeMatch = /^[a-zA-Z0-9.]{2,10}$/.test(q);
 
-    // On découpe la requête en mots pour gérer l'ordre des mots inversé
     const mots = q
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // enlève les accents côté JS aussi
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .split(/\s+/)
       .filter(Boolean);
 
-    // Condition : chaque mot doit apparaître (approximativement) dans search_text,
-    // combinée avec un score de similarité globale sur la requête complète
+    // Seuils de similarité abaissés pour cette requête : on veut toujours
+    // remonter les meilleures correspondances possibles, même avec de grosses
+    // fautes de frappe, plutôt que de filtrer strictement et renvoyer 0 résultat.
+    // SET LOCAL n'a d'effet que dans une transaction explicite, d'où le BEGIN.
+    await client.query('BEGIN');
+    await client.query("SET LOCAL pg_trgm.similarity_threshold = 0.08");
+    await client.query("SET LOCAL pg_trgm.word_similarity_threshold = 0.08");
+
     const wordConditions = mots
-      .map((_, i) => `immutable_unaccent(lower($${i + 2})) <% cim11_codes.search_text`)
+      .map((_, i) => `word_similarity(immutable_unaccent(lower($${i + 2})), cim11_codes.search_text) > 0.08`)
       .join(' OR ');
 
     const params = [q, ...mots];
 
+    // Pas de filtre strict par seuil en WHERE : on calcule un score combiné
+    // pour TOUTES les lignes candidates (celles qui matchent un minimum),
+    // puis on trie par score et on prend les N meilleures. Ça garantit
+    // qu'une requête très abîmée ("sleco") remonte quand même le résultat
+    // le plus proche ("sclérose en plaques") au lieu de renvoyer 0 ligne.
     const sql = `
       SELECT
         id, chapter, code, title, class_kind, parent_code, uri, definition,
         GREATEST(
           similarity(immutable_unaccent(lower(title)), immutable_unaccent(lower($1))),
-          word_similarity(immutable_unaccent(lower($1)), search_text)
+          word_similarity(immutable_unaccent(lower($1)), search_text),
+          word_similarity(search_text, immutable_unaccent(lower($1)))
         ) AS score
       FROM cim11_codes
       WHERE
@@ -58,30 +69,32 @@ async function rechercherCim11(req, res) {
     `;
     params.push(limit);
 
-    const { rows } = await pool.query(sql, params);
+    let { rows } = await client.query(sql, params);
 
-    // Repli : si aucun résultat via trigram (terme trop différent), on tente
-    // une recherche ILIKE partielle sur chaque mot significatif (>=3 lettres)
-    let resultats = rows;
-    if (resultats.length === 0) {
-      const motsSignificatifs = mots.filter((m) => m.length >= 3);
-      if (motsSignificatifs.length > 0) {
-        const ilikeConds = motsSignificatifs
-          .map((_, i) => `immutable_unaccent(lower(title)) ILIKE '%' || immutable_unaccent(lower($${i + 1})) || '%'`)
-          .join(' OR ');
-        const { rows: rows2 } = await pool.query(
-          `SELECT id, chapter, code, title, class_kind, parent_code, uri, definition, 0.1 AS score
-           FROM cim11_codes WHERE ${ilikeConds} LIMIT $${motsSignificatifs.length + 1}`,
-          [...motsSignificatifs, limit]
-        );
-        resultats = rows2;
-      }
+    // Filet de sécurité : si même avec les seuils abaissés rien ne matche
+    // (terme extrêmement différent de tout titre CIM-11), on renvoie quand
+    // même les N titres les plus proches, sans filtre WHERE, pour toujours
+    // proposer une recommandation au clinicien plutôt qu'un résultat vide.
+    if (rows.length === 0) {
+      const { rows: fallbackRows } = await client.query(
+        `SELECT id, chapter, code, title, class_kind, parent_code, uri, definition,
+                similarity(immutable_unaccent(lower(title)), immutable_unaccent(lower($1))) AS score
+         FROM cim11_codes
+         ORDER BY score DESC
+         LIMIT $2`,
+        [q, Math.min(limit, 8)]
+      );
+      rows = fallbackRows;
     }
 
-    res.json({ resultats });
+    await client.query('COMMIT');
+    res.json({ resultats: rows });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* noop */ }
     console.error('Erreur recherche CIM-11 :', err);
     res.status(500).json({ message: 'Erreur lors de la recherche CIM-11' });
+  } finally {
+    client.release();
   }
 }
 

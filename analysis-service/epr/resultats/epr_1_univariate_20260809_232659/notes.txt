@@ -1,0 +1,33 @@
+======================================================================
+RÉSUMÉ DESCRIPTIF DE LA COHORTE
+======================================================================
+Nombre de patients inclus : 204
+Événements (pharmacorésistance confirmée) : 100 (49.0%)
+Censurés : 104
+
+Répartition par catégorie d'âge de début :
+categorie_age_debut   n  evenements  taux
+     Precoce_1_5ans  50          25  50.0
+      Tardif_gt5ans 139          64  46.0
+ Tres_precoce_lt1an  15          11  73.3
+
+Test du log-rank (comparaison des groupes d'âge) :
+  Statistique = 3.201, p = 0.2018
+
+======================================================================
+COX UNIVARIÉ — variable d'exposition : age_debut_crises_mois (continuous)
+======================================================================
+                         coef  exp(coef)  se(coef)  coef lower 95%  coef upper 95%  exp(coef) lower 95%  exp(coef) upper 95%  cmp to       z       p  -log2(p)
+covariate                                                                                                                                                     
+age_debut_crises_mois -0.0031     0.9969     0.002          -0.007          0.0008                0.993               1.0008     0.0 -1.5579  0.1193    3.0678
+
+======================================================================
+COX UNIVARIÉ — TOUTES LES COVARIABLES CANDIDATES
+======================================================================
+                             covariable    HR  IC95_bas  IC95_haut  p_value   n
+              freq_crises_baseline_mois 1.001     1.000      1.001   0.0282 204
+developpement_psychomoteur_avant_crises 1.358     0.889      2.076   0.1570 204
+                 crises_types_multiples 0.727     0.441      1.200   0.2124 204
+                           irm_anormale 1.824     0.449      7.416   0.4007 204
+                 etiologie_structurelle 1.107     0.719      1.705   0.6451 204
+                            eeg_anormal 1.034     0.614      1.743   0.8998 204

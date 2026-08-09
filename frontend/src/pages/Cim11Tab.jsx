@@ -119,8 +119,7 @@ export default function Cim11Tab() {
             <div>
               <h3 style={{ margin: 0, fontSize: 15.5, fontFamily: 'var(--font-display)' }}>CIM-11</h3>
               <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--slate-soft)', maxWidth: 480 }}>
-                Recherche de diagnostics CIM-11 tolérante aux fautes de frappe, accents manquants
-                et ordre des mots.
+                Recherche de diagnostics CIM-11 
               </p>
             </div>
           </div>
