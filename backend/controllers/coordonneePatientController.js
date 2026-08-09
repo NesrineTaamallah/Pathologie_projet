@@ -94,6 +94,12 @@ async function createCoordonnee(req, res) {
   if (!pseudonyme) {
     return res.status(400).json({ error: 'Pseudonyme requis.' });
   }
+  if (!fields.numero_dossier || !String(fields.numero_dossier).trim()) {
+    return res.status(400).json({ error: 'Numéro de dossier requis.' });
+  }
+  if (!fields.nom_prenom || !String(fields.nom_prenom).trim()) {
+    return res.status(400).json({ error: 'Nom et prénom requis.' });
+  }
 
   try {
     const columns = ['pseudonyme', ...SENSITIVE_FIELDS, 'created_by'];

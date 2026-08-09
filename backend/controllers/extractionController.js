@@ -44,7 +44,8 @@ function fusionnerChampMulti(existant, nouveau) {
 function fusionnerAvecExistant(extraction, existant) {
   const fusion = {};
   for (const champ of CHAMPS_SIMPLES) {
-    fusion[champ] = (existant && existant[champ]) ? existant[champ] : (extraction[champ] || '');
+    const valeurExtraite = String(extraction[champ] || '').trim();
+    fusion[champ] = valeurExtraite || (existant && existant[champ]) || '';
   }
   for (const champ of CHAMPS_MULTI) {
     fusion[champ] = fusionnerChampMulti(existant && existant[champ], extraction[champ]);
@@ -95,10 +96,11 @@ async function extraireCoordonneesPatient(req, res) {
     let texteAAnalyser = texte;
     let existant = null;
     let pseudonymeEffectif = pseudonyme || null;
+    let numeroDossierConnu = null;
 
     if (document_id) {
       const docResult = await pool.query(
-        `SELECT texte_transcrit, pseudonyme FROM documents_bruts WHERE id = $1`,
+        `SELECT texte_transcrit, pseudonyme, numero_dossier FROM documents_bruts WHERE id = $1`,
         [document_id]
       );
       const doc = docResult.rows[0];
@@ -107,6 +109,7 @@ async function extraireCoordonneesPatient(req, res) {
       }
       texteAAnalyser = doc.texte_transcrit;
       pseudonymeEffectif = doc.pseudonyme;
+      numeroDossierConnu = doc.numero_dossier ? doc.numero_dossier.trim() : null;
       if (pseudonymeEffectif) {
         existant = await _coordonneeExistante(pseudonymeEffectif);
       }
@@ -116,6 +119,13 @@ async function extraireCoordonneesPatient(req, res) {
         return res.status(404).json({ error: 'Dossier introuvable.' });
       }
       existant = await _coordonneeExistante(pseudonyme);
+      const docsResult = await pool.query(
+        `SELECT numero_dossier FROM documents_bruts WHERE pseudonyme = $1 AND numero_dossier IS NOT NULL LIMIT 1`,
+        [pseudonyme]
+      );
+      if (docsResult.rows[0]?.numero_dossier) {
+        numeroDossierConnu = docsResult.rows[0].numero_dossier.trim();
+      }
     }
 
     if (!texteAAnalyser || !texteAAnalyser.trim()) {
@@ -124,6 +134,9 @@ async function extraireCoordonneesPatient(req, res) {
 
     const extraction = await extraireDonneesPatient(texteAAnalyser);
     const fusion = fusionnerAvecExistant(extraction, existant);
+    if (!fusion.numero_dossier && numeroDossierConnu) {
+      fusion.numero_dossier = numeroDossierConnu;
+    }
 
     await logAccess({
       userId: req.user?.sub,

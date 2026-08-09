@@ -574,7 +574,7 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                     Identité du patient
                   </p>
                   <ExtractionCoordonneesPanel
-                    
+                    documentId={result.document_id}
                     texte={texteCorrige}
                     pseudonymeCible={result.pseudonyme}
                     label="Extraire données patient"
