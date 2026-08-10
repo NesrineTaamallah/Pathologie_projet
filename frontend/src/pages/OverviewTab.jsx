@@ -502,8 +502,9 @@ export default function OverviewTab({ onNavigateToLogs, onNavigateToUser, onNavi
     : null;
   const emailTrendPoints = (data.emailHealth?.dailyTrend || []).map((d) => d.rate ?? 0);
   const tb = data.tempPasswordAgeBuckets || { h0_12: 0, h12_24: 0, h24_48: 0, expired: 0 };
+  const neverLoggedInActive = data.neverLoggedInActive ?? data.neverLoggedIn;
   const sb = data.accountStatusBreakdown || {
-    active: activeAccounts - data.neverLoggedIn, neverLoggedIn: data.neverLoggedIn,
+    active: activeAccounts - neverLoggedInActive, neverLoggedIn: neverLoggedInActive,
     deactivated: data.inactiveAccounts, locked: data.lockedNow,
   };
 

@@ -78,7 +78,6 @@ async function sendCustomEmail(toEmail, subject, message) {
     to: toEmail,
     subject,
     html: `
-      <p>Bonjour,</p>
       <p>${htmlBody}</p>
       <p style="margin-top:24px;color:#64748b;font-size:12px;">
         Ce message vous a été envoyé depuis le registre clinique NeuroExo-Predict par un administrateur.

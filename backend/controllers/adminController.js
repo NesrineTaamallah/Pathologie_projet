@@ -496,6 +496,7 @@ async function getOverview(req, res) {
       pool.query(`
         SELECT
           COUNT(*) FILTER (WHERE last_login_at IS NULL)::int AS never_logged_in,
+          COUNT(*) FILTER (WHERE is_active AND last_login_at IS NULL)::int AS never_logged_in_active,
           COUNT(*) FILTER (WHERE locked_until IS NOT NULL AND locked_until > now())::int AS locked_now,
           COUNT(*) FILTER (WHERE NOT is_active)::int AS inactive_accounts,
           COUNT(*)::int AS total_users
@@ -629,6 +630,7 @@ async function getOverview(req, res) {
       totalUsers: statusCounts.rows[0].total_users,
       roleCounts,
       neverLoggedIn: statusCounts.rows[0].never_logged_in,
+      neverLoggedInActive: statusCounts.rows[0].never_logged_in_active,
       lockedNow: statusCounts.rows[0].locked_now,
       inactiveAccounts: statusCounts.rows[0].inactive_accounts,
       alerts: {
