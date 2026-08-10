@@ -5,6 +5,7 @@ import {
   IconAlert, IconFolder, IconHeart, IconActivity, IconVideo,
 } from '../components/Icons';
 import ExtractionCoordonneesPanel from '../components/ExtractionCoordonneesPanel';
+import ExtractionEntitesPanel from '../components/ExtractionEntitesPanel';
 
 const TYPES_DOCUMENT = [
   { value: 'visite', label: 'Visite' },
@@ -53,6 +54,7 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
   const [showToast, setShowToast] = useState(false);
   
   const [texteValide, setTexteValide] = useState(false);
+  const [coordonneesValidees, setCoordonneesValidees] = useState(false);
 
   
   const [audioUrl, setAudioUrl] = useState(null);
@@ -246,9 +248,9 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
           </p>
         </div>
         <button onClick={onClose} aria-label="Fermer" style={{
-          width: 38, height: 38, borderRadius: 10, border: '1.5px solid var(--line)',
+          width: 38, height: 38, borderRadius: 10, border: '1.5px solid var(--danger, #dc2626)',
           background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--slate)',
+          color: 'var(--danger, #dc2626)',
         }}>
           <IconX size={16} />
         </button>
@@ -414,15 +416,6 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                     accentColor="var(--amber)"
                     accentTint="var(--amber-tint)"
                     onClick={() => { update('type_entree', 'scan'); setFile(null); }}
-                  />
-                  <PathologyCard
-                    active={form.type_entree === 'video'}
-                    icon={<IconVideo size={18} />}
-                    label="Vidéo"
-                    sublabel="Enregistrement vidéo (ex. EEG vidéo), stocké tel quel"
-                    accentColor="var(--blue)"
-                    accentTint="var(--blue-pale)"
-                    onClick={() => { update('type_entree', 'video'); setFile(null); }}
                   />
                 </div>
               </Field>
@@ -610,6 +603,19 @@ export default function AjouterPatientWizard({ onClose, onCreated, existingPatie
                     texte={texteCorrige}
                     pseudonymeCible={result.pseudonyme}
                     label="Extraire données patient"
+                    onValidated={() => setCoordonneesValidees(true)}
+                  />
+                </div>
+              )}
+
+              {coordonneesValidees && result.document_id && (
+                <div style={{ width: '100%', textAlign: 'left', marginTop: 18 }}>
+                  <p style={{ margin: '0 0 6px', fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate-soft)' }}>
+                    Entités médicales
+                  </p>
+                  <ExtractionEntitesPanel
+                    documentId={result.document_id}
+                    label="Extraire entités médicales"
                   />
                 </div>
               )}

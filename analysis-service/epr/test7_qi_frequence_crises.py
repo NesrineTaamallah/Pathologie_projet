@@ -134,6 +134,80 @@ def extraire_depuis_postgres(engine):
     return df
 
 
+# --- Requête de diagnostic --------------------------------------------
+# Exécutée uniquement si SQL_EXTRACTION ne retourne aucune ligne, pour
+# afficher au clinicien/développeur *où précisément* le pipeline
+# d'inclusion s'arrête, sans avoir besoin d'ouvrir psql.
+SQL_DIAGNOSTIC = """
+SELECT
+    (SELECT COUNT(*) FROM patients WHERE registre = 'EPR')
+        AS n_patients_epr,
+    (SELECT COUNT(*) FROM epr_bilan_neuropsy)
+        AS n_bilans_neuropsy_total,
+    (SELECT COUNT(*) FROM epr_bilan_neuropsy WHERE qi IS NOT NULL)
+        AS n_bilans_avec_qi,
+    (SELECT COUNT(*) FROM epr_frequence_crises)
+        AS n_lignes_frequence_crises,
+    (SELECT COUNT(*) FROM epr_frequence_crises WHERE frequence_normalisee_mois IS NOT NULL)
+        AS n_lignes_frequence_normalisee,
+    (SELECT COUNT(*) FROM epr_etiologie
+       WHERE etiologie_principale = TRUE
+         AND categorie_etiologique IS NOT NULL AND categorie_etiologique != 'NA')
+        AS n_avec_etiologie_principale,
+    (SELECT COUNT(*) FROM epr_identification_clinique WHERE age_debut_crises_mois IS NOT NULL)
+        AS n_avec_age_debut_crises,
+    (SELECT COUNT(*)
+     FROM epr_bilan_neuropsy bn
+     JOIN epr_frequence_crises fc
+       ON fc.pseudonyme = bn.pseudonyme
+      AND fc.date_rapport <= bn.date_bilan
+      AND fc.frequence_normalisee_mois IS NOT NULL
+     WHERE bn.qi IS NOT NULL)
+        AS n_bilans_qi_avec_freq_appariee
+;
+"""
+
+
+def _diagnostiquer_absence_de_donnees(engine) -> str:
+    """Construit un message expliquant, poste par poste, pourquoi
+    SQL_EXTRACTION n'a retourné aucune ligne (au lieu de se contenter
+    d'un message générique)."""
+    try:
+        diag = pd.read_sql(SQL_DIAGNOSTIC, engine).iloc[0].to_dict()
+    except Exception as err:
+        return f"(diagnostic non calculable : {err})"
+
+    lignes = [
+        f"  - Patients dans le registre EPR                                  : {diag['n_patients_epr']}",
+        f"  - Bilans neuropsy au total                                       : {diag['n_bilans_neuropsy_total']}",
+        f"  - ... dont avec un QI renseigné (qi IS NOT NULL)                 : {diag['n_bilans_avec_qi']}",
+        f"  - Lignes de fréquence des crises au total                       : {diag['n_lignes_frequence_crises']}",
+        f"  - ... dont avec frequence_normalisee_mois renseignée             : {diag['n_lignes_frequence_normalisee']}",
+        f"  - Patients avec une étiologie principale codée                  : {diag['n_avec_etiologie_principale']}",
+        f"  - Patients avec un âge de début des crises renseigné            : {diag['n_avec_age_debut_crises']}",
+        f"  - Bilans QI appariables à une fréquence antérieure/égale        : {diag['n_bilans_qi_avec_freq_appariee']}",
+    ]
+
+    if diag["n_bilans_avec_qi"] == 0:
+        cause = ("Cause probable : aucun bilan neuropsychologique ne comporte de valeur "
+                 "de QI renseignée dans epr_bilan_neuropsy (colonne 'qi'). Il faut soit "
+                 "saisir/extraire un QI pour au moins quelques patients, soit vérifier que "
+                 "l'extraction automatique des documents remplit bien ce champ.")
+    elif diag["n_bilans_qi_avec_freq_appariee"] == 0:
+        cause = ("Cause probable : des QI existent, mais aucun n'a de mesure de fréquence "
+                 "des crises (epr_frequence_crises) rapportée à une date antérieure ou "
+                 "égale à la date du bilan pour le même patient.")
+    elif diag["n_avec_etiologie_principale"] == 0:
+        cause = ("Cause probable : aucun patient n'a d'étiologie principale codée "
+                 "(epr_etiologie.etiologie_principale = TRUE avec une catégorie valide).")
+    else:
+        cause = ("Les effectifs individuels semblent non nuls : le problème vient probablement "
+                 "du croisement des trois conditions à la fois (mêmes patients requis pour QI, "
+                 "fréquence ET étiologie). Comparer les pseudonymes concernés par chaque poste.")
+
+    return "\n".join(lignes) + "\n\n" + cause
+
+
 def _sauvegarder_resultats_sur_disque(dossier: str, notes: Notes, tables: dict, figures_fig: list):
     """Écrit sur disque, dans `dossier`, TOUT ce que produisait le script
     original : notes.txt (log complet), un CSV par tableau, un PNG par
@@ -165,9 +239,11 @@ def run(engine, config: dict) -> dict:
 
     df = extraire_depuis_postgres(engine)
     if df.empty:
+        diagnostic = _diagnostiquer_absence_de_donnees(engine)
         raise ValueError(
             "Aucun bilan QI exploitable pour cette analyse (QI, fréquence des "
-            "crises et étiologie principale doivent être renseignés)."
+            "crises et étiologie principale doivent être renseignés).\n\n"
+            "Diagnostic détaillé :\n" + diagnostic
         )
 
     df["decalage_inclusion_bilan_mois"] = (

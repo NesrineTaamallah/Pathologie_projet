@@ -430,9 +430,7 @@ def run(engine, config: dict) -> dict:
         dossier_sortie, notes, tables_a_sauvegarder, figures_a_sauvegarder
     )
     notes(f"\nTous les fichiers de sortie (CSV + PNG + notes.txt) ont été sauvegardés dans : {chemin_dossier}")
-    # NB : le chemin complet n'est volontairement pas mis dans resume_stats
-    # (carte "Points clés") — il est long, illisible en carte, et déjà
-    # consultable dans les notes ci-dessus.
+    
 
     return {
         "notes": notes.lines,

@@ -7,6 +7,7 @@ const {
   TABLES_EPR,
 } = require('../utils/entitesExtractionClient');
 const { logAccess } = require('../utils/accessLog');
+const { coderEntitesCim11 } = require('../utils/cim11Coder');
 
 /**
  * Récupère les chunks de texte transcrit d'un pseudonyme, avec leur date,
@@ -82,6 +83,12 @@ async function extraireEntites(req, res) {
         [contexte.documentIds]
       );
     }
+
+    // Codage CIM-11 (recherche floue trigram) des champs diagnostiques
+    // texte-libre (ex: epr_etiologie.detail_*) avant renvoi au clinicien.
+    // persister:true -> trace aussi le match dans entites_cim11 pour
+    // validation ultérieure par le clinicien.
+    await coderEntitesCim11(resultat.tables, { pseudonyme, persister: true });
 
     // CORRECTIF : ne PAS spreader "resultat" tel quel — sa forme est
     // { registre, patient_id, tables: {...}, a_verifier: [...],
@@ -215,6 +222,8 @@ async function extraireEntitesDocument(req, res) {
 
     await logAccess({ userId: req.user?.sub, action: 'extraction_entites_document', success: true, req });
     await pool.query(`UPDATE documents_bruts SET entites_extraites = true WHERE id = $1`, [document_id]);
+
+    await coderEntitesCim11(resultat.tables, { pseudonyme: doc.pseudonyme, persister: true });
 
     res.json({
       pseudonyme: doc.pseudonyme,

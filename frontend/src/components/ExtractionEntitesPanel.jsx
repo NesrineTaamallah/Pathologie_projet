@@ -172,7 +172,7 @@ export default function ExtractionEntitesPanel({
           </p>
         )}
 
-        <div style={{ display: 'flex', gap: 8, position: 'sticky', bottom: 0, background: 'var(--paper)', paddingTop: 6 }}>
+        <div style={{ display: 'flex', gap: 8, paddingTop: 6 }}>
           <button type="button" onClick={enregistrer} disabled={saving}
             style={{
               width: 'auto', margin: 0, padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 6,
