@@ -1,0 +1,6 @@
+variable,coefficient,OR,IC95_bas,IC95_haut,p_value,significatif
+"C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Genetique]",-0.4279379639602226,0.6518518518518521,0.15595881840899048,2.7245066428266447,0.5575790927877677,False
+"C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Immune]",0.8754687373539001,2.4000000000000004,0.3025002357551051,19.041307474097703,0.40740213235155254,False
+"C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Inconnue]",-0.4000742594732879,0.6702702702702703,0.16549949514719905,2.7145837200808205,0.5750640594601276,False
+"C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Metabolique]",-0.35667494393873184,0.7000000000000004,0.1330163985802241,3.683756328017515,0.6737752605820365,False
+"C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Structurelle]",-0.1139442593492173,0.8923076923076927,0.21625651378581068,3.6817990071738698,0.874798161009992,False

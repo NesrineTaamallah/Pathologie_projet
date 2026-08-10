@@ -1,0 +1,71 @@
+RAPPORT D'ANALYSE STATISTIQUE
+Projet : CDR NeuroExo-Predict — Registre Épilepsie pharmacorésistante (EPR)
+Test   : Régression développementale x Catégorie étiologique / Gène impliqué
+Méthode : Chi² d'indépendance
+Classes ACMG retenues pour l'analyse par gène : Classe IV/Classe V
+Date de génération : 2026-08-10 03:24
+======================================================================
+0. RAPPORT DE COMPLÉTUDE DES DONNÉES (avant filtrage)
+======================================================================
+Effectif total registre EPR (epr_identification_clinique) : 217
+
+Table epr_regression_developpementale :
+  - lignes totales           : 202
+  - NULL (non renseigné)     : 0
+  - exploitables pour le test: 202
+
+Table epr_etiologie :
+  - lignes totales (toutes étiologies)     : 208
+  - NULL (non renseigné)                   : 0
+  - 'NA' (non applicable)                  : 0
+  - lignes etiologie_principale = TRUE     : 204
+    (c'est ce sous-ensemble qui est utilisé pour le Chi², afin de garantir 1 ligne par patient et éviter le double comptage)
+
+======================================================================
+1. TEST — Régression développementale x Catégorie étiologique
+======================================================================
+
+Effectif analysé (n, après exclusion des NULL et 'NA') : 202
+
+Tableau de contingence (effectifs observés) :
+categorie_etiologique  Genetique  Immune  Inconnue  Infectieuse  Metabolique  Structurelle
+presence_regression                                                                       
+False                         33       6        42            4           12            39
+True                          14       2        26            5            3            16
+
+Effectifs théoriques attendus sous H0 (indépendance) :
+categorie_etiologique  Genetique  Immune  Inconnue  Infectieuse  Metabolique  Structurelle
+presence_regression                                                                       
+False                      31.64    5.39     45.78         6.06         10.1         37.03
+True                       15.36    2.61     22.22         2.94          4.9         17.97
+
+% de cellules avec effectif théorique < 5 : 25.0%
+Méthode statistique appliquée : Chi² de Pearson
+
+ATTENTION : condition de Cochran violée (effectifs théoriques < 5 dans 25.0% des cellules). Résultat du Chi² à interpréter avec prudence ; envisager un regroupement de catégories rares ou un test de Fisher-Freeman-Halton.
+
+Chi² = 4.907
+Degrés de liberté (ddl) = 5
+p-value = 0.4274
+V de Cramér = 0.156 (force d'association : faible)
+
+Interprétation : l'association entre régression développementale et catégorie étiologique est non statistiquement significative (p = 0.4274 >= 0.05).
+
+1quater. Regroupement des catégories rares (condition de Cochran non respectée) et nouveau test Chi²
+Regroupements appliqués : {'Immune': 'Immune/Infectieuse', 'Infectieuse': 'Immune/Infectieuse'}
+
+Tableau de contingence après regroupement :
+categorie_etiologique_regroupe  Genetique  Immune/Infectieuse  Inconnue  Metabolique  Structurelle
+presence_regression                                                                               
+False                                  33                  10        42           12            39
+True                                   14                   7        26            3            16
+Méthode : Chi² de Pearson
+p-value = 0.5397
+
+Interprétation (après regroupement) : association non statistiquement significative (p = 0.5397 >= 0.05).
+
+======================================================================
+2. TEST — Régression développementale x Gène impliqué (variants Classe IV/Classe V uniquement)
+======================================================================
+
+Aucune donnée exploitable : pas de variant classé Classe IV/Classe V avec régression renseignée.

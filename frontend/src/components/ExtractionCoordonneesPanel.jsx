@@ -4,11 +4,11 @@ import { IconRefresh, IconCheckCircle, IconAlert } from './Icons';
 
 
 export const CHAMPS = [
-  { key: 'numero_dossier', label: 'Numéro de dossier' },
-  { key: 'nom_prenom', label: 'Nom et prénom' },
+  { key: 'numero_dossier', label: 'Numéro de dossier', readonly: true },
+  { key: 'nom_prenom', label: 'Nom et prénom', readonly: true },
   { key: 'date_naissance', label: 'Date de naissance' },
   { key: 'adresse', label: 'Adresse' },
-  { key: 'origine', label: 'Origine' },
+  { key: 'origine', label: 'Origine', readonly: true },
   { key: 'telephone', label: 'Téléphone' },
   { key: 'cin', label: 'CIN' },
   { key: 'num_cnam', label: 'N° CNAM' },
@@ -139,21 +139,31 @@ export default function ExtractionCoordonneesPanel({
         </button>
       </div>
 
-      {CHAMPS.map(({ key, label: champLabel, multi }) => (
+      {CHAMPS.map(({ key, label: champLabel, multi, readonly }) => (
         <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--slate)' }}>
             {champLabel}
             {multi && <span style={{ fontWeight: 400, color: 'var(--slate-soft)' }}> (séparés par des virgules)</span>}
           </label>
-          <input
-            value={fields[key] || ''}
-            onChange={(e) => updateField(key, e.target.value)}
-            placeholder="—"
-            style={{
-              padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--line)',
-              fontSize: 12.5, background: 'var(--card)', boxSizing: 'border-box',
-            }}
-          />
+          {readonly ? (
+            <div style={{
+              padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--line)',
+              fontSize: 12.5, lineHeight: 1.5, background: 'var(--card)', color: 'var(--slate)',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {fields[key] || <span style={{ color: 'var(--slate-soft)' }}>—</span>}
+            </div>
+          ) : (
+            <input
+              value={fields[key] || ''}
+              onChange={(e) => updateField(key, e.target.value)}
+              placeholder="—"
+              style={{
+                padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--line)',
+                fontSize: 12.5, background: 'var(--card)', boxSizing: 'border-box',
+              }}
+            />
+          )}
         </div>
       ))}
 

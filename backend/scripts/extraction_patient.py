@@ -128,7 +128,7 @@ def _charger_modele():
         try:
             model = Llama(
                 model_path=MODEL_PATH,
-                n_ctx=4096,#tu peut amelioere si gpu est super
+                n_ctx=4096,#tu peut amelioere si gpu est superierur a 6go 
                 n_gpu_layers=-1,
                 verbose=False,
             )

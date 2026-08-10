@@ -1,0 +1,82 @@
+[OK] Contrainte d'intégrité vérifiée : 1 étiologie principale / patient.
+======================================================================
+CONTRÔLE QUALITÉ DES DONNÉES
+======================================================================
+Nombre de patients extraits : 204
+[OK] Aucun doublon de pseudonyme.
+
+Données manquantes par colonne (NULL réel + 'NA' littéral convertis) :
+  - age_diagnostic_pharmacoresistance_mois         104 manquants (51.0%)
+
+Patients exclus (étiologie ou statut manquant) : 0
+Effectif final analysable (Chi²) : 204
+
+Répartition par catégorie étiologique :
+categorie_etiologique
+Inconnue        68
+Structurelle    55
+Genetique       49
+Metabolique     15
+Infectieuse      9
+Immune           8
+
+Répartition par statut de pharmacorésistance :
+statut_pharmacoresistance
+False    104
+True     100
+
+======================================================================
+ÉTAPE 1 — TEST DU CHI² D'INDÉPENDANCE
+======================================================================
+
+Tableau de contingence (effectifs observés) :
+statut_pharmacoresistance  False  True 
+categorie_etiologique                  
+Genetique                     27     22
+Immune                         2      6
+Inconnue                      37     31
+Infectieuse                    4      5
+Metabolique                    8      7
+Structurelle                  26     29
+
+Chi² = 3.304, ddl = 5, p-value = 0.6532
+[ATTENTION] 4 cellule(s) avec effectif théorique < 5 -> envisager le test exact de Fisher ou un regroupement de catégories.
+V de Cramér (taille d'effet) = 0.127
+
+=> Association non significative au seuil de 0.05 entre étiologie ILAE et statut de pharmacorésistance.
+
+======================================================================
+ÉTAPE 2 — RÉGRESSION LOGISTIQUE (catégorie étiologique, réf. = Infectieuse)
+======================================================================
+Formule du modèle : y ~ C(categorie_etiologique, Treatment(reference='Infectieuse'))
+Covariables d'ajustement retenues : aucune (modèle brut)
+Effectif utilisé dans le modèle : 204 / 204
+                           Logit Regression Results                           
+==============================================================================
+Dep. Variable:                      y   No. Observations:                  204
+Model:                          Logit   Df Residuals:                      198
+Method:                           MLE   Df Model:                            5
+Date:                Mon, 10 Aug 2026   Pseudo R-squ.:                 0.01202
+Time:                        03:24:09   Log-Likelihood:                -139.66
+converged:                       True   LL-Null:                       -141.36
+Covariance Type:            nonrobust   LLR p-value:                    0.6389
+================================================================================================================================================
+                                                                                   coef    std err          z      P>|z|      [0.025      0.975]
+------------------------------------------------------------------------------------------------------------------------------------------------
+Intercept                                                                        0.2231      0.671      0.333      0.739      -1.092       1.538
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Genetique]       -0.4279      0.730     -0.586      0.558      -1.858       1.002
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Immune]           0.8755      1.057      0.828      0.407      -1.196       2.947
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Inconnue]        -0.4001      0.714     -0.561      0.575      -1.799       0.999
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Metabolique]     -0.3567      0.847     -0.421      0.674      -2.017       1.304
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Structurelle]    -0.1139      0.723     -0.158      0.875      -1.531       1.303
+================================================================================================================================================
+
+Tableau des Odds Ratios (référence = Infectieuse) :
+                                                                              coefficient     OR  IC95_bas  IC95_haut  p_value  significatif
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Genetique]          -0.428  0.652     0.156      2.725    0.558         False
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Immune]              0.875  2.400     0.303     19.041    0.407         False
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Inconnue]           -0.400  0.670     0.165      2.715    0.575         False
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Metabolique]        -0.357  0.700     0.133      3.684    0.674         False
+C(categorie_etiologique, Treatment(reference='Infectieuse'))[T.Structurelle]       -0.114  0.892     0.216      3.682    0.875         False
+
+Pseudo-R² de McFadden = 0.012
