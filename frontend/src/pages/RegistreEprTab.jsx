@@ -52,10 +52,10 @@ export default function RegistreEprTab() {
           label="Pharmacorésistance confirmée"
           value={pctLabel(data.pharmacoresistance?.confirmes, data.pharmacoresistance?.total)}
         />
-        <HeroStatCard label="Fréquence de crises moyenne" value={data.frequenceCrisesMoyenne != null ? `${data.frequenceCrisesMoyenne} /mois` : '—'} />
+        <HeroStatCard label="Fréquence moyenne de crises" value={data.frequenceCrisesMoyenne != null ? `${data.frequenceCrisesMoyenne} /mois` : '—'} />
         <HeroStatCard label="Âge moyen au début des crises" value={data.ageDebutCrisesMoyenMois != null ? `${data.ageDebutCrisesMoyenMois} mois` : '—'} />
         <HeroStatCard label="Âge moyen au diagnostic pharmacorésistance" value={data.ageDiagnosticPharmacoresistanceMoyenMois != null ? `${data.ageDiagnosticPharmacoresistanceMoyenMois} mois` : '—'} />
-        <HeroStatCard label="Durée de suivi moyenne" value={data.dureeSuiviMoyenneMois != null ? `${data.dureeSuiviMoyenneMois} mois` : '—'} />
+        <HeroStatCard label="Durée moyenne de suivi" value={data.dureeSuiviMoyenneMois != null ? `${data.dureeSuiviMoyenneMois} mois` : '—'} />
         <HeroStatCard
           label="Durée moyenne des crises"
           value={data.dureeMoyenneCrisesMin != null ? `${data.dureeMoyenneCrisesMin} min` : '—'}

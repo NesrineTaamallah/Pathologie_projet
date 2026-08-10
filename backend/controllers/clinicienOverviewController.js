@@ -118,8 +118,8 @@ async function getClinicienOverview(req, res) {
           COALESCE(COUNT(p.pseudonyme) FILTER (WHERE p.registre = 'SEP'), 0)::int AS sep,
           COALESCE(COUNT(p.pseudonyme) FILTER (WHERE p.registre = 'EPR'), 0)::int AS epr
         FROM generate_series(
-          date_trunc('month', now()) - interval '11 months',
-          date_trunc('month', now()),
+          date_trunc('month', (now() AT TIME ZONE 'Africa/Tunis')::date) - interval '11 months',
+          date_trunc('month', (now() AT TIME ZONE 'Africa/Tunis')::date),
           interval '1 month'
         ) m
         LEFT JOIN patients p

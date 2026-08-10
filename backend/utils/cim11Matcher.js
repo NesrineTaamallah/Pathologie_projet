@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 
 
-const SEUIL_SIMILARITE = 0.30; 
+const SEUIL_SIMILARITE = 0.5;
 
 
 async function trouverMeilleurCodeCim11(terme, options = {}) {

@@ -29,16 +29,17 @@ async function rechercherCim11(req, res) {
       .split(/\s+/)
       .filter(Boolean);
 
-    // Seuils de similarité abaissés pour cette requête : on veut toujours
-    // remonter les meilleures correspondances possibles, même avec de grosses
-    // fautes de frappe, plutôt que de filtrer strictement et renvoyer 0 résultat.
-    // SET LOCAL n'a d'effet que dans une transaction explicite, d'où le BEGIN.
+    // Seuils de similarité : suffisamment permissifs pour tolérer les fautes
+    // de frappe courantes, mais assez stricts pour éviter le bruit (résultats
+    // sans rapport). SET LOCAL n'a d'effet que dans une transaction explicite,
+    // d'où le BEGIN.
+    const SEUIL = 0.3;
     await client.query('BEGIN');
-    await client.query("SET LOCAL pg_trgm.similarity_threshold = 0.08");
-    await client.query("SET LOCAL pg_trgm.word_similarity_threshold = 0.08");
+    await client.query(`SET LOCAL pg_trgm.similarity_threshold = ${SEUIL}`);
+    await client.query(`SET LOCAL pg_trgm.word_similarity_threshold = ${SEUIL}`);
 
     const wordConditions = mots
-      .map((_, i) => `word_similarity(immutable_unaccent(lower($${i + 2})), cim11_codes.search_text) > 0.08`)
+      .map((_, i) => `word_similarity(immutable_unaccent(lower($${i + 2})), cim11_codes.search_text) > ${SEUIL}`)
       .join(' OR ');
 
     const params = [q, ...mots];
@@ -64,6 +65,7 @@ async function rechercherCim11(req, res) {
         OR (${wordConditions})
       ORDER BY
         (lower(code) = lower($1)) DESC,
+        (class_kind = 'category') DESC,
         score DESC NULLS LAST
       LIMIT $${mots.length + 2}
     `;
@@ -80,7 +82,7 @@ async function rechercherCim11(req, res) {
         `SELECT id, chapter, code, title, class_kind, parent_code, uri, definition,
                 similarity(immutable_unaccent(lower(title)), immutable_unaccent(lower($1))) AS score
          FROM cim11_codes
-         ORDER BY score DESC
+         ORDER BY (class_kind = 'category') DESC, score DESC
          LIMIT $2`,
         [q, Math.min(limit, 8)]
       );
