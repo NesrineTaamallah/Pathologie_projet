@@ -63,48 +63,6 @@ export default function RegistreEprTab() {
         />
       </div>
 
-      {/* ---------- Statut déclaratif vs calcul ILAE ----------
-          Le champ epr_pharmacoresistance.statut_pharmacoresistance_confirme
-          est saisi à la main ; le calcul ILAE (≥2 échecs par inefficacité,
-          analytics.v_epr_pharmacoresistance_detail) est objectif. Une
-          divergence entre les deux est un signal à vérifier, pas juste une
-          statistique de plus. */}
-      {data.pharmacoresistanceIlae && data.pharmacoresistanceIlae.total > 0 && (
-        <div
-          className="card"
-          style={{ borderLeft: data.pharmacoresistanceIlae.divergents > 0 ? '3px solid var(--amber)' : '3px solid transparent' }}
-        >
-          <CardTitle hint="Statut saisi par le clinicien comparé au calcul objectif ILAE (≥2 antiépileptiques adaptés en échec par inefficacité, sur epr_liste_ae).">
-            Pharmacorésistance — déclaratif vs calcul ILAE
-          </CardTitle>
-          <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ fontSize: 12, color: 'var(--slate)', margin: 0 }}>Déclaré par le clinicien</p>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, margin: '4px 0 0', color: 'var(--ink)' }}>
-                {data.pharmacoresistanceIlae.declares_positifs} / {data.pharmacoresistanceIlae.total}
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: 12, color: 'var(--slate)', margin: 0 }}>Calculé (critère ILAE)</p>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, margin: '4px 0 0', color: 'var(--ink)' }}>
-                {data.pharmacoresistanceIlae.calcules_positifs} / {data.pharmacoresistanceIlae.total}
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: 12, color: 'var(--slate)', margin: 0 }}>Patients divergents</p>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, margin: '4px 0 0', color: data.pharmacoresistanceIlae.divergents > 0 ? 'var(--amber, orange)' : 'var(--ink)' }}>
-                {data.pharmacoresistanceIlae.divergents}
-              </p>
-            </div>
-          </div>
-          {data.pharmacoresistanceIlae.divergents > 0 && (
-            <p className="hint" style={{ marginTop: 10 }}>
-              À vérifier : ces patients ont un statut saisi qui ne correspond pas au calcul ILAE sur leur historique d'antiépileptiques essayés.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* ---------- Antécédents et développement avant les crises ----------
           atcd_familiaux_epilepsie et developpement_psychomoteur_avant_crises
           n'apparaissaient jusqu'ici nulle part, alors que

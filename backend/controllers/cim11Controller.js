@@ -10,6 +10,11 @@ const pool = require('../config/db');
  *    en découpant la requête en mots-clés et en les combinant en ET logique
  *    sur search_text (qui contient titre + définition)
  *  - correspondance directe par code (ex: "8A61")
+ *
+ * NB : seules les entités possédant un code CIM-11 réel (typiquement
+ * class_kind = 'category') sont retournées. Les regroupements/chapitres
+ * (block, chapter) qui n'ont pas de code assignable sont filtrés, pour
+ * que le clinicien n'associe toujours qu'un vrai diagnostic codé.
  */
 async function rechercherCim11(req, res) {
   const client = await pool.connect();
@@ -44,11 +49,12 @@ async function rechercherCim11(req, res) {
 
     const params = [q, ...mots];
 
-    // Pas de filtre strict par seuil en WHERE : on calcule un score combiné
-    // pour TOUTES les lignes candidates (celles qui matchent un minimum),
-    // puis on trie par score et on prend les N meilleures. Ça garantit
-    // qu'une requête très abîmée ("sleco") remonte quand même le résultat
-    // le plus proche ("sclérose en plaques") au lieu de renvoyer 0 ligne.
+    // Filtre code IS NOT NULL / non vide : on ne garde que les entités
+    // codées (class_kind = 'category' dans la pratique). Pas de filtre
+    // strict par seuil en WHERE sinon : on calcule un score combiné pour
+    // toutes les lignes candidates codées, puis on trie et on prend les N
+    // meilleures, pour qu'une requête abîmée ("sleco") remonte quand même
+    // le résultat codé le plus proche ("sclérose en plaques").
     const sql = `
       SELECT
         id, chapter, code, title, class_kind, parent_code, uri, definition,
@@ -59,10 +65,13 @@ async function rechercherCim11(req, res) {
         ) AS score
       FROM cim11_codes
       WHERE
-        ${codeMatch ? 'lower(code) = lower($1) OR' : ''}
-        immutable_unaccent(lower(title)) % immutable_unaccent(lower($1))
-        OR search_text % immutable_unaccent(lower($1))
-        OR (${wordConditions})
+        code IS NOT NULL AND code <> ''
+        AND (
+          ${codeMatch ? 'lower(code) = lower($1) OR' : ''}
+          immutable_unaccent(lower(title)) % immutable_unaccent(lower($1))
+          OR search_text % immutable_unaccent(lower($1))
+          OR (${wordConditions})
+        )
       ORDER BY
         (lower(code) = lower($1)) DESC,
         (class_kind = 'category') DESC,
@@ -75,13 +84,15 @@ async function rechercherCim11(req, res) {
 
     // Filet de sécurité : si même avec les seuils abaissés rien ne matche
     // (terme extrêmement différent de tout titre CIM-11), on renvoie quand
-    // même les N titres les plus proches, sans filtre WHERE, pour toujours
-    // proposer une recommandation au clinicien plutôt qu'un résultat vide.
+    // même les N titres codés les plus proches, sans filtre WHERE sur le
+    // score, pour toujours proposer une recommandation au clinicien plutôt
+    // qu'un résultat vide — mais toujours uniquement des entités codées.
     if (rows.length === 0) {
       const { rows: fallbackRows } = await client.query(
         `SELECT id, chapter, code, title, class_kind, parent_code, uri, definition,
                 similarity(immutable_unaccent(lower(title)), immutable_unaccent(lower($1))) AS score
          FROM cim11_codes
+         WHERE code IS NOT NULL AND code <> ''
          ORDER BY (class_kind = 'category') DESC, score DESC
          LIMIT $2`,
         [q, Math.min(limit, 8)]
